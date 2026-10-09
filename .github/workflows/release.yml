@@ -70,13 +70,34 @@ jobs:
           $ver = if ('${{ github.ref_name }}' -match 'v(.+)') { $matches[1] } elseif ('${{ inputs.version }}') { '${{ inputs.version }}' } else { '0.0.0' }
           "BYSTERM_VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           New-Item -ItemType Directory -Force installer\com0com | Out-Null
-          # imzali com0com (3.0.0.0, i386+x64). SourceForge indirmesi basarisizsa installer com0com'suz uretilir.
-          $url = 'https://downloads.sourceforge.net/project/com0com/com0com/3.0.0.0/com0com-3.0.0.0-i386-and-x64-signed.zip'
-          try {
-            Invoke-WebRequest -Uri $url -OutFile com0com.zip -UseBasicParsing -TimeoutSec 120
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocol]::Tls12
+          # imzali com0com (3.0.0.0, i386+x64). Birkac aynaya sirayla bak; indirilen dosya ZIP mi diye dogrula.
+          $urls = @(
+            'https://sourceforge.net/projects/com0com/files/com0com/3.0.0.0/com0com-3.0.0.0-i386-and-x64-signed.zip/download',
+            'https://downloads.sourceforge.net/project/com0com/com0com/3.0.0.0/com0com-3.0.0.0-i386-and-x64-signed.zip',
+            'https://master.dl.sourceforge.net/project/com0com/com0com/3.0.0.0/com0com-3.0.0.0-i386-and-x64-signed.zip'
+          )
+          $ok = $false
+          foreach ($u in $urls) {
+            try {
+              Invoke-WebRequest -Uri $u -OutFile com0com.zip -UseBasicParsing -TimeoutSec 180 -Headers @{ 'User-Agent' = 'Mozilla/5.0' }
+              $fs = [IO.File]::OpenRead((Resolve-Path com0com.zip)); $b = New-Object byte[] 2; $null = $fs.Read($b,0,2); $fs.Close()
+              if ($b[0] -eq 0x50 -and $b[1] -eq 0x4B) { $ok = $true; Write-Host "com0com indi: $u"; break }
+              else { Write-Host "ZIP degil (aynadan HTML geldi): $u" }
+            } catch { Write-Host "basarisiz: $u -> $_" }
+          }
+          if ($ok) {
             Expand-Archive com0com.zip -DestinationPath installer\com0com -Force
-            "WITH_COM0COM=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          } catch { Write-Host "com0com indiriledi: $_" }
+            # setup.exe ustu bir alt klasorde olabilir -> koke tasi
+            $setup = Get-ChildItem installer\com0com -Recurse -Filter setup.exe | Select-Object -First 1
+            if ($setup -and $setup.DirectoryName -ne (Resolve-Path installer\com0com).Path) {
+              Copy-Item "$($setup.DirectoryName)\*" installer\com0com -Recurse -Force
+            }
+            if (Test-Path installer\com0com\setup.exe) {
+              "WITH_COM0COM=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+              Write-Host "com0com pakete eklenecek."
+            } else { Write-Host "setup.exe bulunamadi; com0com'suz devam." }
+          } else { Write-Host "Hicbir ayna vermedi; installer com0com'suz uretilecek." }
       - name: Build installer (Inno Setup)
         shell: pwsh
         run: |
