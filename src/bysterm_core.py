@@ -237,8 +237,11 @@ class Formatter:
             h += f' {peer}'
         return h + ' '
 
+    translate = staticmethod(lambda s: s)      # GUI dil secimine gore ayarlar (bilgi satirlari icin)
+
     def text_line(self, ts, kind, text):
         """Bilgi/hata satiri (her zaman kendi satirinda)."""
+        text = Formatter.translate(text)
         pre = '\n' if self.line_open else ''
         stamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S.%f')[:-3]
         self.last_key = None

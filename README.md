@@ -22,7 +22,15 @@ Her sekmede: **ASCII / HEX / HEX+ASCII** görünüm, zaman damgası, renkli RX/T
 temizle, ekranı kaydet, **kayıt** (`.log` = zaman damgalı metin, `.bin` = ham RX baytları),
 ASCII (`\r \n \t \xHH` kaçışlı) veya HEX gönderme, satır sonu (CR / LF / CR+LF),
 gönderim geçmişi (↑/↓), **periyodik tekrar** (ms), dosya gönder. Aynı türden istediğiniz
-kadar sekme açabilirsiniz (üstteki `+ Seri`, `+ UDP` …). Son ayarlar hatırlanır.
+kadar bölme açabilirsiniz (soldaki listede araç adının yanındaki **+**). Son ayarlar hatırlanır.
+
+**Pencereler (Terminator gibi):** soldaki araç adına tıklamak seçili bölmenin içeriğini o araca
+çevirir; **+** yanına yeni bölme açar. Bölmeleri başlığından tutup sürükleyerek başka bir bölmenin
+sağına/soluna/üstüne/altına bırakabilir, aradaki çizgiyle büyütüp küçültebilirsiniz.
+
+**Dil:** Ayarlar → *Language / Dil* → Türkçe veya English. Seçilen dilde menüler, yardım metinleri,
+günlük satırları ve tablo başlıkları dahil her şey o dilde görünür (gönderilen/alınan veri asla
+değiştirilmez). Koyu / açık tema da Ayarlar menüsündedir.
 
 ## İndir ve çalıştır (kurulum yok)
 
@@ -125,8 +133,8 @@ python3 src/test_bysterm_core.py    # çekirdek testleri
 Tek dosya paket: `pip install pyinstaller` → `python3 ci/build.py` → `release/`.
 Linux için tüm sistemlerde çalışan paket: `docker run --rm -v "$PWD":/src -w /src ubuntu:18.04 bash ci/build_linux_docker.sh`
 
-**Yeni sürüm yayınlamak:** `src/bysterm.py` içindeki `APP_VERSION`'ı artırın, sonra
-GitHub → **Actions** → *Build & Release* → **Run workflow** → sürümü yazın (ör. `1.0.1`). (Veya `git tag v1.0.1 && git push origin v1.0.1`.) GitHub Actions bütün platformları derler,
+**Yeni sürüm yayınlamak:** `src/bysterm.py` içindeki `APP_VERSION`ı artırın, sonra
+GitHub → **Actions** → *Build & Release* → **Run workflow** → sürümü yazın (ör. `0.3.1`). (Veya `git tag v0.3.1 && git push origin v0.3.1`.) GitHub Actions bütün platformları derler,
 test eder ve Releases'a koyar.
 
 | Dosya | İçerik |
@@ -134,6 +142,7 @@ test eder ve Releases'a koyar.
 | `src/bysterm.py` | Arayüz (Qt: PySide6 → PyQt5 → PySide2 sırasıyla denenir) |
 | `src/bysterm_core.py` | Qt'siz çekirdek: transport'lar, port tarama, biçimleyici, köprü |
 | `src/bysterm_net.py` | Qt'siz ağ katmanı: arayüz okuma/yazma, ping, IP tarama, iperf3 protokolü, yönetici yardımcısı |
+| `src/bysterm_i18n.py`, `src/bysterm_i18n_data.py` | Dil desteği. Çeviriler `ci/i18n_map.json`'da; düzenledikten sonra `python3 ci/gen_i18n.py` |
 | `src/test_bysterm_core.py` | Çekirdek testleri |
 | `ci/` | Paketleme (PyInstaller), Linux Docker derlemesi, selftest betikleri |
 | `.github/workflows/release.yml` | Otomatik derleme + Release |

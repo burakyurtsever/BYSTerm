@@ -1,0 +1,33 @@
+name: Retag releases (one-off)
+
+# Tek seferlik bakim: erken yayinlanan 1.x surumlerini 0.x semasina tasir (proje henuz 1.0 degil).
+# Her surumun etiketi AYNI commit'e yeni adla olusturulur, release yeni etikete baglanir, eski etiket silinir.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      R: ${{ github.repository }}
+    steps:
+      - name: Rename v1.x -> v0.x
+        run: |
+          set -e
+          for pair in v1.0.0:v0.1.0 v1.1.0:v0.2.0 v1.2.0:v0.2.1 v1.3.0:v0.2.2; do
+            old=${pair%%:*}; new=${pair##*:}
+            if ! gh api "repos/$R/releases/tags/$old" >/dev/null 2>&1; then
+              echo "$old yok, atlaniyor"; continue
+            fi
+            sha=$(gh api "repos/$R/commits/$old" --jq .sha)
+            echo "$old ($sha) -> $new"
+            gh api "repos/$R/git/refs" -f ref="refs/tags/$new" -f sha="$sha" >/dev/null 2>&1 || echo "  $new etiketi zaten var"
+            id=$(gh api "repos/$R/releases/tags/$old" --jq .id)
+            gh api -X PATCH "repos/$R/releases/$id" -f tag_name="$new" -f name="BYSTerm $new" >/dev/null
+            gh api -X DELETE "repos/$R/git/refs/tags/$old" || true
+          done
+          gh api "repos/$R/releases" --jq '.[] | "\(.tag_name)  \(.name)"'

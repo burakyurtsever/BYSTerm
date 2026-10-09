@@ -78,12 +78,12 @@ if QT_API is None:
 import bysterm_core as core   # noqa: E402
 import bysterm_net as net   # noqa: E402
 import bysterm_update as upd   # noqa: E402
-from bysterm_i18n import tr, set_lang, LANGS   # noqa: E402
+from bysterm_i18n import tr, tx, tx_exact, set_lang, LANGS   # noqa: E402
 
 from bysterm_core import RX, TX  # noqa: E402
 
 APP_NAME = 'BYSTerm'
-APP_VERSION = '1.3.0'
+APP_VERSION = '0.3.0'
 
 Qt = QtCore.Qt
 W = QtWidgets
@@ -220,6 +220,115 @@ class Terminal(W.QPlainTextEdit):
         if autoscroll:
             sb = self.verticalScrollBar()
             sb.setValue(sb.maximum())
+
+
+# =========================================================================== dil (arayuz metinleri)
+_I18N_DONE = False
+
+
+def install_i18n():
+    """Tum arayuz metinlerini secili dile cevir: Qt'nin metin ayarlayan metodlari ve metin alan
+    kuruculari sarmalanir (Qt'nin kendi olusturdugu ic widget'lar dahil). Veri (RX/TX baytlari,
+    kullanicinin yazdigi degerler) cevrilmez. Dil degisimi yeniden baslatinca gecerli olur."""
+    global _I18N_DONE
+    if _I18N_DONE:
+        return
+    _I18N_DONE = True
+    core.Formatter.translate = staticmethod(tx)
+
+    def _tx_for(w):
+        # Duzenlenebilir kutulardaki ogeler kullanici verisi olabilir (gonderme gecmisi, port adlari):
+        # parca degistirme YAPMA, sadece birebir bilinen metinleri cevir. 'raw' isaretliyse hic dokunma.
+        if isinstance(w, W.QComboBox):
+            if w.property('raw'):
+                return None
+            if w.isEditable():
+                return tx_exact
+        return tx
+
+    def first(cls, name):            # ilk str argumani cevir
+        orig = getattr(cls, name, None)
+        if orig is None:
+            return
+
+        def f(self, *a, **k):
+            t = _tx_for(self)
+            if t is None:
+                pass
+            elif a and isinstance(a[0], str):
+                a = (t(a[0]),) + a[1:]
+            elif len(a) >= 2 and not isinstance(a[0], str) and isinstance(a[1], str):
+                a = (a[0], t(a[1])) + a[2:]          # addItem(icon, text) / insertItem(i, text)
+            return orig(self, *a, **k)
+        try:
+            setattr(cls, name, f)
+        except (TypeError, AttributeError):
+            pass
+
+    def listarg(cls, name):          # liste argumani (addItems, basliklar)
+        orig = getattr(cls, name, None)
+        if orig is None:
+            return
+
+        def f(self, items, *a, **k):
+            t = _tx_for(self)
+            if t is not None:
+                items = [t(x) if isinstance(x, str) else x for x in items]
+            return orig(self, items, *a, **k)
+        try:
+            setattr(cls, name, f)
+        except (TypeError, AttributeError):
+            pass
+
+    for cls, names in ((W.QLabel, ('setText',)), (W.QAbstractButton, ('setText',)),
+                       (W.QWidget, ('setToolTip', 'setWindowTitle')),
+                       (W.QLineEdit, ('setPlaceholderText',)), (W.QGroupBox, ('setTitle',)),
+                       (W.QComboBox, ('addItem', 'insertItem', 'setItemText')),
+                       (W.QSpinBox, ('setSuffix', 'setPrefix', 'setSpecialValueText')),
+                       (W.QDoubleSpinBox, ('setSuffix', 'setPrefix', 'setSpecialValueText')),
+                       (W.QMenu, ('addAction', 'addMenu', 'setTitle')), (W.QToolBar, ('addAction',)),
+                       (W.QStatusBar, ('showMessage',)), (W.QMessageBox, ('setText', 'setWindowTitle')),
+                       (W.QTableWidgetItem, ('setText', 'setToolTip')), (W.QListWidgetItem, ('setText',))):
+        for n in names:
+            first(cls, n)
+    listarg(W.QComboBox, 'addItems')
+    listarg(W.QTableWidget, 'setHorizontalHeaderLabels')
+    # statik diyaloglar
+    for n in ('question', 'warning', 'information', 'critical'):
+        orig = getattr(W.QMessageBox, n)
+
+        def mk(orig):
+            def f(parent, title, text, *a, **k):
+                return orig(parent, tx(title), tx(text), *a, **k)
+            return staticmethod(f)
+        setattr(W.QMessageBox, n, mk(orig))
+    for n in ('getSaveFileName', 'getOpenFileName'):
+        orig = getattr(W.QFileDialog, n)
+
+        def mk(orig):
+            def f(parent=None, caption='', directory='', filt='', *a, **k):
+                return orig(parent, tx(caption), directory, tx(filt), *a, **k)
+            return staticmethod(f)
+        setattr(W.QFileDialog, n, mk(orig))
+    orig_gt = W.QInputDialog.getText
+
+    def get_text(parent, title, label, *a, **k):
+        return orig_gt(parent, tx(title), tx(label), *a, **k)
+    W.QInputDialog.getText = staticmethod(get_text)
+
+    # metin alan kurucular
+    def ctor(base):
+        class T(base):
+            def __init__(self, *a, **k):
+                if a and isinstance(a[0], str):
+                    a = (tx(a[0]),) + a[1:]
+                super().__init__(*a, **k)
+        T.__name__ = base.__name__
+        T.__qualname__ = base.__qualname__
+        return T
+    for name in ('QLabel', 'QPushButton', 'QCheckBox', 'QRadioButton', 'QGroupBox', 'QTableWidgetItem',
+                 'QListWidgetItem'):
+        setattr(W, name, ctor(getattr(W, name)))
 
 
 # =========================================================================== akan yerlesim
@@ -391,11 +500,14 @@ class SerialSettings(W.QWidget):
         self.bits = W.QComboBox()
         self.bits.addItems(['8', '7', '6', '5'])
         self.parity = W.QComboBox()
-        self.parity.addItems(list(core.PARITIES))
+        for k in core.PARITIES:              # gorunen metin cevrilir, anahtar itemData'da kalir
+            self.parity.addItem(k, k)
         self.stop = W.QComboBox()
-        self.stop.addItems(list(core.STOPBITS))
+        for k in core.STOPBITS:
+            self.stop.addItem(k, k)
         self.flow = W.QComboBox()
-        self.flow.addItems(core.FLOWS)
+        for k in core.FLOWS:
+            self.flow.addItem(k, k)
 
         if with_port:
             lay.addWidget(W.QLabel('Port'))
@@ -445,14 +557,16 @@ class SerialSettings(W.QWidget):
         except ValueError:
             raise ValueError('Gecersiz baud') from None
         return core.SerialConfig(dev, baud, int(self.bits.currentText()),
-                                 core.PARITIES[self.parity.currentText()],
-                                 core.STOPBITS[self.stop.currentText()],
-                                 self.flow.currentText())
+                                 core.PARITIES[self.parity.currentData()],
+                                 core.STOPBITS[self.stop.currentData()],
+                                 self.flow.currentData())
 
     def save(self, st, prefix):
         st.setValue(f'{prefix}/port', self.current_device())
-        for k in ('baud', 'bits', 'parity', 'stop', 'flow'):
-            st.setValue(f'{prefix}/{k}', getattr(self, k).currentText())
+        st.setValue(f'{prefix}/baud', self.baud.currentText())
+        st.setValue(f'{prefix}/bits', self.bits.currentText())
+        for k in ('parity', 'stop', 'flow'):
+            st.setValue(f'{prefix}/{k}', getattr(self, k).currentData())
 
     def load(self, st, prefix):
         dev = st.value(f'{prefix}/port', '')
@@ -460,16 +574,21 @@ class SerialSettings(W.QWidget):
             idx = self.port.findData(dev)
             if idx >= 0:
                 self.port.setCurrentIndex(idx)
-        for k in ('baud', 'bits', 'parity', 'stop', 'flow'):
+        v = st.value(f'{prefix}/baud', None)
+        if v:
+            self.baud.setCurrentText(str(v))
+        v = st.value(f'{prefix}/bits', None)
+        if v and self.bits.findText(str(v)) >= 0:
+            self.bits.setCurrentIndex(self.bits.findText(str(v)))
+        for k in ('parity', 'stop', 'flow'):
             v = st.value(f'{prefix}/{k}', None)
-            if v:
-                cb = getattr(self, k)
-                if cb.isEditable():
-                    cb.setCurrentText(str(v))
-                else:
-                    i = cb.findText(str(v))
-                    if i >= 0:
-                        cb.setCurrentIndex(i)
+            cb = getattr(self, k)
+            if v is not None:
+                i = cb.findData(str(v))
+                if i < 0:
+                    i = cb.findText(str(v))       # eski surum ayari (metin olarak kaydedilmis)
+                if i >= 0:
+                    cb.setCurrentIndex(i)
 
 
 # =========================================================================== oturum tabani
@@ -569,6 +688,7 @@ class Session(W.QWidget):
         sl = FlowLayout(self.send_box)
         self.send_edit = W.QComboBox()
         self.send_edit.setEditable(True)
+        self.send_edit.setProperty('raw', True)     # gonderilecek veri: asla cevrilmez
         self.send_edit.setInsertPolicy(qenum(W.QComboBox, 'InsertPolicy.NoInsert'))
         self.send_edit.setMaxCount(50)
         self.send_edit.setMinimumWidth(220)
@@ -616,7 +736,7 @@ class Session(W.QWidget):
         st.addWidget(self.lbl_state)
         root.addLayout(st)
 
-        self.fmt = core.Formatter(labels=self.labels())
+        self.fmt = core.Formatter(labels={k: tx(v) for k, v in self.labels().items()})
         self._fmt_changed()
 
         # --- zamanlayicilar
@@ -693,12 +813,12 @@ class Session(W.QWidget):
                 v = st.value(f'{p}/{key}', None)
                 if v is not None:
                     w.setChecked(str(v).lower() in ('1', 'true'))
-            for key, w in (('send_mode', self.send_mode), ('eol', self.eol)):
-                v = st.value(f'{p}/{key}', None)
-                if v is not None:
-                    i = w.findText(str(v))
-                    if i >= 0:
-                        w.setCurrentIndex(i)
+            v = st.value(f'{p}/send_mode', None)
+            if v is not None and self.send_mode.findText(str(v)) >= 0:
+                self.send_mode.setCurrentIndex(self.send_mode.findText(str(v)))
+            v = st.value(f'{p}/eol_i', None)
+            if v is not None and 0 <= int(v) < self.eol.count():
+                self.eol.setCurrentIndex(int(v))
             hist = st.value(f'{p}/history', None)
             if hist:
                 if isinstance(hist, str):
@@ -718,7 +838,7 @@ class Session(W.QWidget):
         st.setValue(f'{p}/tx', self.chk_tx.isChecked())
         st.setValue(f'{p}/esc', self.chk_esc.isChecked())
         st.setValue(f'{p}/send_mode', self.send_mode.currentText())
-        st.setValue(f'{p}/eol', self.eol.currentText())
+        st.setValue(f'{p}/eol_i', self.eol.currentIndex())
         st.setValue(f'{p}/history', [self.send_edit.itemText(i) for i in range(self.send_edit.count())])
         self.save_settings(st)
 
@@ -737,6 +857,7 @@ class Session(W.QWidget):
             return
         self.store_settings()
         t.labels = self.labels() if not getattr(t, 'labels', None) else t.labels
+        t.labels = {k: tx(v) for k, v in t.labels.items()}
         self.fmt.labels = t.labels
         self.transport = t
         self.set_busy()
@@ -1022,7 +1143,7 @@ class Session(W.QWidget):
         if self.send_mode.currentText() == 'HEX':
             return core.parse_hex(text)
         data = core.parse_escapes(text) if self.chk_esc.isChecked() else text.encode('utf-8')
-        data += {'CR': b'\r', 'LF': b'\n', 'CR+LF': b'\r\n'}.get(self.eol.currentText(), b'')
+        data += (b'', b'\r', b'\n', b'\r\n')[max(0, self.eol.currentIndex())]
         return data
 
     def send_now(self, from_timer=False):
@@ -1665,8 +1786,8 @@ class MonitorSession(Session):
     def tab_label(self):
         if self.cur_mode() == 'live':
             d = self.proc.currentData()
-            return 'Dinle ' + (os.path.basename(d[1]) if d else '')
-        return 'Izleme ' + os.path.basename(self.ss.current_device() or '')
+            return tx('Dinle ') + os.path.basename(d[1]) if d else tx('Seri Izleme')
+        return tx('Izleme ') + os.path.basename(self.ss.current_device() or '')
 
     def update_ports(self, ports):
         if not self.transport:
@@ -1816,7 +1937,7 @@ def combo_value(cb):
     if i >= 0 and cb.itemText(i) == cb.currentText():
         return cb.itemData(i) or ''
     t = cb.currentText().strip()
-    return '' if t.lower() == 'otomatik' else t
+    return '' if t.lower() in ('otomatik', tx('Otomatik').lower()) else t
 
 
 class ToolTab(W.QWidget):
@@ -2375,7 +2496,7 @@ class PingTab(ToolTab):
         loss = 100.0 * (st['sent'] - st['recv']) / st['sent']
         avg = st['sum'] / st['recv'] if st['recv'] else None
         f = lambda v: f'{v:.2f} ms' if v is not None else '-'   # noqa: E731
-        vals = {1: w.ip or '?', 2: ('● cevap veriyor' if r.ok else '✖ ' + r.err),
+        vals = {1: w.ip or '?', 2: ('● cevap veriyor' if r.ok else '✖ ' + tx(r.err)),
                 3: f(r.rtt if r.ok else None), 4: f(avg), 5: f(st['min']), 6: f(st['max']),
                 7: f(st['jit'] if st['recv'] > 1 else None), 8: f'%{loss:.1f}',
                 9: f'{st["sent"]} / {st["recv"]}'}
@@ -2389,7 +2510,7 @@ class PingTab(ToolTab):
             if changed or not r.ok:
                 txt = f'{h}: ▲ CEVAP VERMEYE BASLADI' if r.ok else f'{h}: ▼ CEVAP KESILDI ({r.err})'
                 if first and not r.ok:
-                    txt = f'{h}: cevap vermiyor ({r.err})'
+                    txt = f'{h}: cevap vermiyor ({tx(r.err)})'
                 segs += self.fmt.text_line(ts, 'info' if r.ok else 'error', txt)
                 if self.chk_beep.isChecked() and changed:
                     W.QApplication.beep()
@@ -2398,10 +2519,10 @@ class PingTab(ToolTab):
             if r.ok:
                 ttl = f'  TTL={r.ttl}' if r.ttl else ''
                 segs.append(('hdr', f'{stamp} '))
-                segs.append((RX, f'{h} ({w.ip})  sira={seq}  sure={r.rtt:.2f} ms{ttl}\n'))
+                segs.append((RX, f'{h} ({w.ip})  {tx("sira")}={seq}  {tx("sure")}={r.rtt:.2f} ms{ttl}\n'))
             else:
                 segs.append(('hdr', f'{stamp} '))
-                segs.append(('error', f'{h}  sira={seq}  {r.err}\n'))
+                segs.append(('error', f'{h}  {tx("sira")}={seq}  {tx(r.err)}\n'))
         return segs
 
     def shutdown(self):
@@ -2437,7 +2558,7 @@ class ScanTab(ToolTab):
         self.btn.clicked.connect(self.toggle)
         top.addWidget(W.QLabel('Ag karti'))
         top.addWidget(self.cb_if)
-        top.addWidget(W.QLabel('Aralik'))
+        top.addWidget(W.QLabel('IP araligi'))
         top.addWidget(self.ed_range, 1)
         top.addWidget(W.QLabel('Zaman asimi'))
         top.addWidget(self.sp_to)
@@ -2447,7 +2568,7 @@ class ScanTab(ToolTab):
         self.prog.setTextVisible(True)
         root.addWidget(self.prog)
         self.table = W.QTableWidget()
-        _setup_table(self.table, ['IP', 'Sure', 'TTL (tahmini sistem)', 'MAC', 'Host adi'], 4)
+        _setup_table(self.table, ['IP', 'Yanit suresi', 'TTL (tahmini sistem)', 'MAC', 'Host adi'], 4)
         self.table.setSortingEnabled(True)
         self.table.setContextMenuPolicy(qenum(Qt, 'ContextMenuPolicy.CustomContextMenu'))
         self.table.customContextMenuRequested.connect(self._menu)
@@ -2532,8 +2653,8 @@ class ScanTab(ToolTab):
                 r = self._row(ev[1])
                 self.table.item(r, 1).setText(f'{ev[2]:.1f} ms' if ev[2] is not None else 'ping yok (ARP\'de var)')
                 ttl = ev[3]
-                guess = '' if ttl is None else (' Linux/Jetson/cihaz' if ttl <= 64 else
-                                                (' Windows' if ttl <= 128 else ' ag cihazi'))
+                guess = '' if ttl is None else (tx(' Linux/Jetson/cihaz') if ttl <= 64 else
+                                                (' Windows' if ttl <= 128 else tx(' ag cihazi')))
                 self.table.item(r, 2).setText(f'{ttl}{guess}' if ttl else '-')
             elif k == 'mac':
                 self.table.item(self._row(ev[1]), 3).setText(ev[2])
@@ -2762,15 +2883,17 @@ class IperfTab(ToolTab):
                 segs.append((RX, line + '\n'))
             elif k == 'result':
                 r = ev[2]
-                lines = [f'── SONUC ({r["elapsed"]:.1f} sn) ──',
-                         f'  Gonderen: {net.fmt_bytes(r["sent_bytes"]):>10}  {net.fmt_rate(r["sent_bps"]):>14}',
-                         f'  Alan    : {net.fmt_bytes(r["recv_bytes"]):>10}  {net.fmt_rate(r["recv_bps"]):>14}']
-                summ = f'Alan tarafta olculen: {net.fmt_rate(r["recv_bps"])}'
+                snd, rcv = tx('Gonderen'), tx('Alan')
+                wd = max(len(snd), len(rcv))
+                lines = [f'── {tx("SONUC")} ({r["elapsed"]:.1f} {tx("sn")}) ──',
+                         f'  {snd:<{wd}}: {net.fmt_bytes(r["sent_bytes"]):>10}  {net.fmt_rate(r["sent_bps"]):>14}',
+                         f'  {rcv:<{wd}}: {net.fmt_bytes(r["recv_bytes"]):>10}  {net.fmt_rate(r["recv_bps"]):>14}']
+                summ = f'{tx("Alan tarafta olculen")}: {net.fmt_rate(r["recv_bps"])}'
                 if r.get('udp'):
                     pk = r.get('packets') or 0
                     lost = r.get('lost', 0)
                     pct = 100.0 * lost / pk if pk else 0
-                    lines.append(f'  UDP     : jitter {r.get("jitter_ms", 0):.3f} ms   kayip {lost}/{pk} (%{pct:.2f})')
+                    lines.append(f'  {"UDP":<{wd}}: jitter {r.get("jitter_ms", 0):.3f} ms   {tx("kayip")} {lost}/{pk} (%{pct:.2f})')
                     summ += f'   jitter {r.get("jitter_ms", 0):.2f} ms   kayip %{pct:.2f}'
                 segs.append(('info', '\n'.join(lines) + '\n'))
                 self.lbl_rate.setText(net.fmt_rate(r['recv_bps']))
@@ -3174,6 +3297,13 @@ class Splash(W.QWidget):
         del math
 
 
+ABOUT_TEXT = ('BYSTerm is a fast test and monitoring tool for embedded and network developers. '
+              'It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, '
+              'IP scanning and iperf3 speed tests together in one window with side-by-side panes. '
+              'It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson '
+              'without any installation.')
+
+
 class AboutDialog(W.QDialog):
     def __init__(self, main):
         super().__init__(main)
@@ -3205,12 +3335,7 @@ class AboutDialog(W.QDialog):
         top.addLayout(tl, 1)
         lay.addLayout(top)
         lay.addSpacing(10)
-        txt = W.QLabel(tr('about_text') if tr('about_text') != 'about_text' else (
-            'BYSTerm is a fast test and monitoring tool for embedded and network developers. '
-            'It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, '
-            'IP scanning and iperf3 speed tests together in one window with side-by-side panes. '
-            'It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson '
-            'without any installation.'))
+        txt = W.QLabel(tx(ABOUT_TEXT))
         txt.setWordWrap(True)
         txt.setStyleSheet('font-size: 13px; line-height: 140%;')
         lay.addWidget(txt)
@@ -3539,7 +3664,7 @@ class Pane(W.QFrame):
             self.title.setText('<span style="color:#888">(bos)</span>')
             return
         dot = '<span style="color:#3DDC84">●</span> ' if s.connected else ''
-        self.title.setText(f'{dot}<b>{s.tab_label()}</b>')
+        self.title.setText(f'{dot}<b>{tx(s.tab_label())}</b>')
 
     def set_active(self, on):
         self.setProperty('active', 'true' if on else 'false')
@@ -3644,7 +3769,19 @@ class Workspace(W.QWidget):
         if self.zoomed is not None:
             self.toggle_zoom(self.zoomed)
         if orient is None:     # Terminator gibi: uzun kenar yonunde bol
+            ms = pane.minimumSizeHint()
+
+            def fits(p, o):    # iki yarisi da asgari boyutun ustunde kalir mi (pencere ekrandan tasmasin)
+                return p.width() >= 2 * max(ms.width(), 160) + 5 if o == 'h' else \
+                    p.height() >= 2 * max(ms.height(), 120) + 5
+            if not (fits(pane, 'h') or fits(pane, 'v')):
+                big = max(self.panes(), key=lambda p: p.width() * p.height())
+                if fits(big, 'h') or fits(big, 'v'):
+                    pane = big    # secili bolme cok kucuk -> en buyuk bolmenin yanina ac
             orient = 'h' if pane.width() >= pane.height() * 1.2 else 'v'
+            alt = 'v' if orient == 'h' else 'h'
+            if not fits(pane, orient) and fits(pane, alt):
+                orient = alt
         qo = qenum(Qt, 'Orientation.Horizontal' if orient == 'h' else 'Orientation.Vertical')
         new = Pane(self, session)
         par = pane.parentWidget()
@@ -3910,12 +4047,12 @@ class Sidebar(W.QWidget):
                 b.setObjectName('tool')
                 b.setIcon(tool_icon(cls.KIND))
                 b.setIconSize(QtCore.QSize(18, 18))
-                b.setToolTip(f'{cls.TITLE}: seçili pencerenin içeriğini buna çevir')
+                b.setToolTip(tx('{t}: seçili pencerenin içeriğini buna çevir').replace('{t}', tx(cls.TITLE)))
                 b.clicked.connect(lambda _=False, c=cls: main.open_tool(c, split=False))
                 plus = W.QToolButton()
                 plus.setIcon(_icon('plus', ACC))
                 plus.setAutoRaise(True)
-                plus.setToolTip(f'Yeni {cls.TITLE}: aktif bolmenin YANINA ac (Terminator gibi)')
+                plus.setToolTip(tx('Yeni {t}: aktif bolmenin YANINA ac (Terminator gibi)').replace('{t}', tx(cls.TITLE)))
                 plus.clicked.connect(lambda _=False, c=cls: main.open_tool(c, split=True))
                 row.addWidget(b, 1)
                 row.addWidget(plus)
@@ -4061,7 +4198,7 @@ class MainWindow(W.QMainWindow):
         if hasattr(self, 'sidebar'):
             self.sidebar.refresh(self.sessions, ws)
         if getattr(ws, 'active', None) is not None and ws.active.session is not None:
-            self.setWindowTitle(f'{APP_NAME} {APP_VERSION} — {self.ws.active.session.tab_label()}')
+            self.setWindowTitle(f'{APP_NAME} {APP_VERSION} — {tx(self.ws.active.session.tab_label())}')
 
     # -- portlar
     def _scan_loop(self):
@@ -4348,6 +4485,7 @@ def main():
     cfg = QtCore.QSettings(APP_NAME, APP_NAME)
     on = lambda k, d='true': str(cfg.value(k, d)).lower() in ('1', 'true')   # noqa: E731
     set_lang(str(cfg.value('lang', 'tr')))
+    install_i18n()
     ask_admin = on('ask_admin')
     if (core.IS_WIN and ask_admin and not selftest and not net.is_admin()
             and '--elevated' not in sys.argv):
@@ -4409,7 +4547,9 @@ def _selftest(win):
     wd = threading.Timer(60, watchdog)
     wd.daemon = True
     wd.start()
-    print(f'{APP_NAME} selftest: pencere acildi', flush=True)
+    import bysterm_i18n
+    print(f'{APP_NAME} selftest: pencere acildi (dil={bysterm_i18n.LANG}, '
+          f'{len(bysterm_i18n.FULL)} ceviri, ornek: {tx("Baglan")!r})', flush=True)
     srv = win.add_session(TcpServerSession)
     cli = win.add_session(TcpClientSession)
     srv.port.setValue(0)

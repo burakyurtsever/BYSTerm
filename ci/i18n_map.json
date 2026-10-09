@@ -1,0 +1,2010 @@
+{
+ "\n\nCalistirilacak komutlar:\n": {
+  "en": "\n\nCommands to run:\n",
+  "tr": "\n\nÇalıştırılacak komutlar:\n"
+ },
+ "\n\nDIKKAT: Bu kart su an varsayilan ag gecidine (internet/uzak baglanti) sahip. Degistirirseniz bu karttan yapilan baglantilar kopabilir. Interneti korumak icin \"Ek IP olarak ekle\" kullanabilirsiniz.": {
+  "en": "\n\nWARNING: This adapter currently holds the default gateway (internet/remote connection). If you change it, connections made through this adapter may drop. To keep internet access, you can use \"Add as extra IP\".",
+  "tr": "\n\nDİKKAT: Bu kart şu an varsayılan ağ geçidine (internet/uzak bağlantı) sahip. Değiştirirseniz bu karttan yapılan bağlantılar kopabilir. İnterneti korumak için \"Ek IP olarak ekle\" kullanabilirsiniz."
+ },
+ "\n\nNot: ": {
+  "en": "\n\nNote: ",
+  "tr": "\n\nNot: "
+ },
+ "   (-R: bu PC gonderir, -u -b 100M: UDP).   Bu PC'nin IP'leri: ": {
+  "en": "   (-R: this PC sends, -u -b 100M: UDP).   This PC's IPs: ",
+  "tr": "   (-R: bu PC gönderir, -u -b 100M: UDP).   Bu PC'nin IP'leri: "
+ },
+ "  (Linux: kullaniciyi 'dialout' grubuna ekleyin: sudo usermod -aG dialout $USER ; sonra oturumu kapatip acin)": {
+  "en": "  (Linux: add the user to the 'dialout' group: sudo usermod -aG dialout $USER ; then log out and back in)",
+  "tr": "  (Linux: kullanıcıyı 'dialout' grubuna ekleyin: sudo usermod -aG dialout $USER ; sonra oturumu kapatıp açın)"
+ },
+ "  (Port baska bir uygulamada acik olabilir.)": {
+  "en": "  (The port may be open in another application.)",
+  "tr": "  (Port başka bir uygulamada açık olabilir.)"
+ },
+ "  (cihaz ": {
+  "en": "  (device ",
+  "tr": "  (cihaz "
+ },
+ "  (diger cihazdan: iperf3 -c <bu PC IP> -p ": {
+  "en": "  (from the other device: iperf3 -c <this PC IP> -p ",
+  "tr": "  (diğer cihazdan: iperf3 -c <bu PC IP> -p "
+ },
+ "  (yerel ": {
+  "en": "  (local ",
+  "tr": "  (yerel "
+ },
+ "  <->  sanal port ": {
+  "en": "  <->  virtual port ",
+  "tr": "  <->  sanal port "
+ },
+ "  Alan    : ": {
+  "en": "  Receiver: ",
+  "tr": "  Alan    : "
+ },
+ "  Gonderen: ": {
+  "en": "  Sender  : ",
+  "tr": "  Gönderen: "
+ },
+ "  hedef ": {
+  "en": "  target ",
+  "tr": "  hedef "
+ },
+ "  sira=": {
+  "en": "  seq=",
+  "tr": "  sıra="
+ },
+ "  sure=": {
+  "en": "  time=",
+  "tr": "  süre="
+ },
+ " &nbsp; <i>[kayit acik]</i>": {
+  "en": " &nbsp; <i>[recording]</i>",
+  "tr": " &nbsp; <i>[kayıt açık]</i>"
+ },
+ " (bu arada cihazdan gelen ": {
+  "en": " (meanwhile ",
+  "tr": " (bu arada cihazdan gelen "
+ },
+ " (sanal)": {
+  "en": " (virtual)",
+  "tr": " (sanal)"
+ },
+ " (ters)": {
+  "en": " (reverse)",
+  "tr": " (ters)"
+ },
+ " (yeni NetworkManager profili \"": {
+  "en": " (new NetworkManager profile \"",
+  "tr": " (yeni NetworkManager profili \""
+ },
+ " DNS bu modda ayarlanamaz.": {
+  "en": " DNS cannot be set in this mode.",
+  "tr": " DNS bu modda ayarlanamaz."
+ },
+ " Linux/Jetson/cihaz": {
+  "en": " Linux/Jetson/device",
+  "tr": " Linux/Jetson/cihaz"
+ },
+ " adres taraniyor...": {
+  "en": " addresses, scanning...",
+  "tr": " adres taranıyor..."
+ },
+ " adresine baglaniliyor...": {
+  "en": " — connecting...",
+  "tr": " adresine bağlanılıyor..."
+ },
+ " ag cihazi": {
+  "en": " network device",
+  "tr": " ağ cihazı"
+ },
+ " aginda bos IP araniyor...": {
+  "en": " network: searching for a free IP...",
+  "tr": " ağında boş IP aranıyor..."
+ },
+ " akis, ": {
+  "en": " streams, ",
+  "tr": " akış, "
+ },
+ " baglandi (": {
+  "en": " connected (",
+  "tr": " bağlandı ("
+ },
+ " bayt atildi": {
+  "en": " bytes dropped",
+  "tr": " bayt atıldı"
+ },
+ " bayt uygulamaya iletilmedi)": {
+  "en": " bytes from the device were not forwarded to the application)",
+  "tr": " bayt uygulamaya iletilmedi)"
+ },
+ " bayt)": {
+  "en": " bytes)",
+  "tr": " bayt)"
+ },
+ " bu portu artik acmiyor: ": {
+  "en": " no longer has this port open: ",
+  "tr": " bu portu artık açmıyor: "
+ },
+ " bulunamadi": {
+  "en": " not found",
+  "tr": " bulunamadı"
+ },
+ " cihaz bulundu (": {
+  "en": " devices found (",
+  "tr": " cihaz bulundu ("
+ },
+ " ekranda gosterilmedi (cok yuksek hiz; sayac ve kayit eksiksiz)": {
+  "en": " not shown on screen (very high rate; counters and recording are complete)",
+  "tr": " ekranda gösterilmedi (çok yüksek hız; sayaç ve kayıt eksiksiz)"
+ },
+ " iperf3 sunucusuna baglaniliyor (": {
+  "en": " — connecting to iperf3 server (",
+  "tr": " iperf3 sunucusuna bağlanılıyor ("
+ },
+ " ms   kayip ": {
+  "en": " ms   loss ",
+  "tr": " ms   kayıp "
+ },
+ " ms   kayip %": {
+  "en": " ms   loss %",
+  "tr": " ms   kayıp %"
+ },
+ " portuna erisim izniniz yok.\n\nIzin verilsin mi? (yonetici sifresi bir kez sorulur; kullaniciniz kalici olarak \"dialout\" grubuna da eklenir)": {
+  "en": ": you do not have permission to access this port.\n\nGrant access? (the administrator password is asked once; your user is also permanently added to the \"dialout\" group)",
+  "tr": " portuna erişim izniniz yok.\n\nİzin verilsin mi? (yönetici şifresi bir kez sorulur; kullanıcınız kalıcı olarak \"dialout\" grubuna da eklenir)"
+ },
+ " secili istemci": {
+  "en": " selected client(s)",
+  "tr": " seçili istemci"
+ },
+ " seri port bulundu   |   Qt: ": {
+  "en": " serial ports found   |   Qt: ",
+  "tr": " seri port bulundu   |   Qt: "
+ },
+ " sn": {
+  "en": " s",
+  "tr": " sn"
+ },
+ " sn) ──": {
+  "en": " s) ──",
+  "tr": " sn) ──"
+ },
+ " sn). Sag tik: kopyala / Ping'e ekle / bu cihazin agina gec.": {
+  "en": " s). Right-click: copy / add to Ping / join this device's network.",
+  "tr": " sn). Sağ tık: kopyala / Ping'e ekle / bu cihazın ağına geç."
+ },
+ " sn, ": {
+  "en": " s, ",
+  "tr": " sn, "
+ },
+ " sn]  ": {
+  "en": " s]  ",
+  "tr": " sn]  "
+ },
+ " zaten var ve bir symlink degil": {
+  "en": " already exists and is not a symlink",
+  "tr": " zaten var ve bir symlink değil"
+ },
+ "\" portunu acin.": {
+  "en": "\" in the other application.",
+  "tr": "\" portunu açın."
+ },
+ "(ag karti listesi bekleniyor)": {
+  "en": "(waiting for network adapter list)",
+  "tr": "(ağ kartı listesi bekleniyor)"
+ },
+ "(seri port acmis uygulama bulunamadi — once o uygulamada portu acin)": {
+  "en": "(no application with an open serial port found — open the port in that application first)",
+  "tr": "(seri port açmış uygulama bulunamadı — önce o uygulamada portu açın)"
+ },
+ ")  sira=": {
+  "en": ")  seq=",
+  "tr": ")  sıra="
+ },
+ ") IP ile ayni alt agda degil (": {
+  "en": ") is not in the same subnet as the IP (",
+  "tr": ") IP ile aynı alt ağda değil ("
+ },
+ ") gercek porta uygulanamadi: ": {
+  "en": ") to the real port: ",
+  "tr": ") gerçek porta uygulanamadı: "
+ },
+ ").\n\"Ek IP olarak ekle\" ile internetiniz bozulmadan cihaza ulasabilirsiniz.": {
+  "en": ").\nWith \"Add as extra IP\" you can reach the device without breaking your internet.",
+  "tr": ").\n\"Ek IP olarak ekle\" ile internetiniz bozulmadan cihaza ulaşabilirsiniz."
+ },
+ "). Diger uygulamada \"": {
+  "en": "). Open \"",
+  "tr": "). Diğer uygulamada \""
+ },
+ "). IP degistirirken tekrar sorulacak.": {
+  "en": "). You will be asked again when changing IP.",
+  "tr": "). IP değiştirirken tekrar sorulacak."
+ },
+ "). Izlenen uygulama hic degismez; sanal port yok. (Pasif dinleme)": {
+  "en": "). The monitored application is not changed; no virtual port. (Passive capture)",
+  "tr": "). İzlenen uygulama hiç değişmez; sanal port yok. (Pasif dinleme)"
+ },
+ ", TERS yon (sunucu gonderir)": {
+  "en": ", REVERSE direction (server sends)",
+  "tr": ", TERS yön (sunucu gönderir)"
+ },
+ ". Diger uygulamada sanal ciftin OBUR ucunu acin.": {
+  "en": ". Open the OTHER end of the virtual pair in the other application.",
+  "tr": ". Diğer uygulamada sanal çiftin ÖBÜR ucunu açın."
+ },
+ ". Uygulamak icin \"Uygula\" veya \"Ek IP olarak ekle\".": {
+  "en": ". To apply, use \"Apply\" or \"Add as extra IP\".",
+  "tr": ". Uygulamak için \"Uygula\" veya \"Ek IP olarak ekle\"."
+ },
+ "0 = sistem rastgele port secer": {
+  "en": "0 = system picks a random port",
+  "tr": "0 = sistem rastgele port seçer"
+ },
+ "192.168.1.0/24  veya  192.168.1.1-254  veya  10.0.0.5-10.0.0.40": {
+  "en": "192.168.1.0/24  or  192.168.1.1-254  or  10.0.0.5-10.0.0.40",
+  "tr": "192.168.1.0/24  veya  192.168.1.1-254  veya  10.0.0.5-10.0.0.40"
+ },
+ "250 ms BREAK sinyali gonder": {
+  "en": "Send a 250 ms BREAK signal",
+  "tr": "250 ms BREAK sinyali gönder"
+ },
+ "255.255.255.255 / x.x.x.255 adreslerine gondermeye izin ver": {
+  "en": "Allow sending to 255.255.255.255 / x.x.x.255 addresses",
+  "tr": "255.255.255.255 / x.x.x.255 adreslerine göndermeye izin ver"
+ },
+ ": IP sil ": {
+  "en": ": remove IP ",
+  "tr": ": IP sil "
+ },
+ ": aktif bolmenin YANINA ac (Terminator gibi)": {
+  "en": ": open NEXT TO the active pane (like Terminator)",
+  "tr": ": aktif bölmenin YANINA aç (Terminator gibi)"
+ },
+ ": baglanti / test calisiyor. Kapatilsin mi?": {
+  "en": ": connection / test is running. Close it?",
+  "tr": ": bağlantı / test çalışıyor. Kapatılsın mı?"
+ },
+ ": bulunamadi": {
+  "en": ": not found",
+  "tr": ": bulunamadı"
+ },
+ ": cevap vermiyor (": {
+  "en": ": not responding (",
+  "tr": ": cevap vermiyor ("
+ },
+ ": cozulemedi (": {
+  "en": ": could not resolve (",
+  "tr": ": çözülemedi ("
+ },
+ ": ek IP ": {
+  "en": ": extra IP ",
+  "tr": ": ek IP "
+ },
+ ": erisim izni veriliyor...": {
+  "en": ": granting access...",
+  "tr": ": erişim izni veriliyor..."
+ },
+ ": gonderme hatasi: ": {
+  "en": ": send error: ",
+  "tr": ": gönderme hatası: "
+ },
+ ": izin verildi, port yeniden aciliyor. (Kalici izin: bir sonraki oturum acilisinda gecerli olur.)": {
+  "en": ": access granted, reopening port. (Permanent permission takes effect at your next login.)",
+  "tr": ": izin verildi, port yeniden açılıyor. (Kalıcı izin: bir sonraki oturum açılışında geçerli olur.)"
+ },
+ ": izin verilemedi: ": {
+  "en": ": could not grant access: ",
+  "tr": ": izin verilemedi: "
+ },
+ ": izin verilmeyen secenek": {
+  "en": ": option not allowed",
+  "tr": ": izin verilmeyen seçenek"
+ },
+ ": seçili pencerenin içeriğini buna çevir": {
+  "en": ": switch the selected pane to this",
+  "tr": ": seçili pencerenin içeriğini buna çevir"
+ },
+ ": statik ": {
+  "en": ": static ",
+  "tr": ": statik "
+ },
+ ": test hatasi: ": {
+  "en": ": test error: ",
+  "tr": ": test hatası: "
+ },
+ ": zaman asimi": {
+  "en": ": timeout",
+  "tr": ": zaman aşımı"
+ },
+ ": ▲ CEVAP VERMEYE BASLADI": {
+  "en": ": ▲ STARTED RESPONDING",
+  "tr": ": ▲ CEVAP VERMEYE BAŞLADI"
+ },
+ ": ▼ CEVAP KESILDI (": {
+  "en": ": ▼ STOPPED RESPONDING (",
+  "tr": ": ▼ CEVAP KESİLDİ ("
+ },
+ "<b style=\"color:#3DDC84\">● ACIK</b>  ": {
+  "en": "<b style=\"color:#3DDC84\">● OPEN</b>  ",
+  "tr": "<b style=\"color:#3DDC84\">● AÇIK</b>  "
+ },
+ "<span style=\"color:#3DDC84\">🔓 Yonetici izni: verildi</span>": {
+  "en": "<span style=\"color:#3DDC84\">🔓 Admin rights: granted</span>",
+  "tr": "<span style=\"color:#3DDC84\">🔓 Yönetici izni: verildi</span>"
+ },
+ "<span style=\"color:#3DDC84\">🔓 Yonetici: aktif</span>": {
+  "en": "<span style=\"color:#3DDC84\">🔓 Admin: active</span>",
+  "tr": "<span style=\"color:#3DDC84\">🔓 Yönetici: aktif</span>"
+ },
+ "<span style=\"color:#888\">(bos)</span>": {
+  "en": "<span style=\"color:#888\">(empty)</span>",
+  "tr": "<span style=\"color:#888\">(boş)</span>"
+ },
+ "<span style=\"color:#888\">○ Kapali</span>": {
+  "en": "<span style=\"color:#888\">○ Closed</span>",
+  "tr": "<span style=\"color:#888\">○ Kapalı</span>"
+ },
+ "<span style=\"color:#888\">🔒 Yonetici izni yok (IP degisikliginde sorulur)</span>": {
+  "en": "<span style=\"color:#888\">🔒 No admin rights (asked when changing IP)</span>",
+  "tr": "<span style=\"color:#888\">🔒 Yönetici izni yok (IP değişikliğinde sorulur)</span>"
+ },
+ "A new version of BYSTerm is available: {new}  (you have {cur})": {
+  "en": "A new version of BYSTerm is available: {new}  (you have {cur})",
+  "tr": "BYSTerm'in yeni sürümü çıktı: {new}  (sizdeki {cur})"
+ },
+ "AG ARACLARI": {
+  "en": "NETWORK TOOLS",
+  "tr": "AĞ ARAÇLARI"
+ },
+ "ASCII gonderimde sona eklenecek satir sonu": {
+  "en": "Line ending appended when sending ASCII",
+  "tr": "ASCII gönderimde sona eklenecek satır sonu"
+ },
+ "ASCII gorunumde yazdirilamayan baytlari <0D> seklinde goster (kapaliysa \".\")": {
+  "en": "Show non-printable bytes as <0D> in ASCII view (\".\" when off)",
+  "tr": "ASCII görünümde yazdırılamayan baytları <0D> şeklinde göster (kapalıysa \".\")"
+ },
+ "ASCII icinde \\r \\n \\t \\0 \\xHH kullanilabilir": {
+  "en": "\\r \\n \\t \\0 \\xHH can be used in ASCII",
+  "tr": "ASCII içinde \\r \\n \\t \\0 \\xHH kullanılabilir"
+ },
+ "About": {
+  "en": "About",
+  "tr": "Hakkında"
+ },
+ "Ac": {
+  "en": "Open",
+  "tr": "Aç"
+ },
+ "Aciklama": {
+  "en": "Description",
+  "tr": "Açıklama"
+ },
+ "Acilista yonetici izni iste (IP degistirme, seri port izni)": {
+  "en": "Ask for admin rights at startup (IP changes, serial port access)",
+  "tr": "Açılışta yönetici izni iste (IP değiştirme, seri port izni)"
+ },
+ "Aciliyor...": {
+  "en": "Opening...",
+  "tr": "Açılıyor..."
+ },
+ "Ag Ayarlari": {
+  "en": "Network Settings",
+  "tr": "Ağ Ayarları"
+ },
+ "Ag arayuzu bulunamadi": {
+  "en": "No network interface found",
+  "tr": "Ağ arayüzü bulunamadı"
+ },
+ "Ag ayarini uygula": {
+  "en": "Apply network settings",
+  "tr": "Ağ ayarını uygula"
+ },
+ "Ag karti": {
+  "en": "Network adapter",
+  "tr": "Ağ kartı"
+ },
+ "Akis": {
+  "en": "Flow",
+  "tr": "Akış"
+ },
+ "Alan": {
+  "en": "Receiver",
+  "tr": "Alan"
+ },
+ "Alan tarafta olculen": {
+  "en": "Measured at receiver",
+  "tr": "Alan tarafta ölçülen"
+ },
+ "Alan tarafta olculen: ": {
+  "en": "Measured at receiver: ",
+  "tr": "Alan tarafta ölçülen: "
+ },
+ "Alta bol  (Ctrl+Shift+O)": {
+  "en": "Split down  (Ctrl+Shift+O)",
+  "tr": "Alta böl  (Ctrl+Shift+O)"
+ },
+ "Ana": {
+  "en": "Main",
+  "tr": "Ana"
+ },
+ "Arac": {
+  "en": "Tool",
+  "tr": "Araç"
+ },
+ "Aralik": {
+  "en": "Interval",
+  "tr": "Aralık"
+ },
+ "Arayuz": {
+  "en": "Interface",
+  "tr": "Arayüz"
+ },
+ "Arayuzler okunamadi: ": {
+  "en": "Could not read interfaces: ",
+  "tr": "Arayüzler okunamadı: "
+ },
+ "Araç adı: seçili pencerede aç\n+ : yanına yeni pencere ekle\n\nCtrl+Shift+E yana böl · O alta böl\nX tam ekran · W kapat · Ctrl+Tab geç": {
+  "en": "Tool name: open in the selected pane\n+ : add a new pane next to it\n\nCtrl+Shift+E split right · O split down\nX fullscreen · W close · Ctrl+Tab switch",
+  "tr": "Araç adı: seçili pencerede aç\n+ : yanına yeni pencere ekle\n\nCtrl+Shift+E yana böl · O alta böl\nX tam ekran · W kapat · Ctrl+Tab geç"
+ },
+ "BAGLANTI": {
+  "en": "CONNECTION",
+  "tr": "BAĞLANTI"
+ },
+ "BASARISIZ": {
+  "en": "FAILED",
+  "tr": "BAŞARISIZ"
+ },
+ "BYSTerm is a fast test and monitoring tool for embedded and network developers. It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, IP scanning and iperf3 speed tests together in one window with side-by-side panes. It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson without any installation.": {
+  "en": "BYSTerm is a fast test and monitoring tool for embedded and network developers. It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, IP scanning and iperf3 speed tests together in one window with side-by-side panes. It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson without any installation.",
+  "tr": "BYSTerm, gömülü sistem ve ağ geliştiricileri için hızlı bir test ve izleme aracıdır. Seri port, TCP, UDP, seri trafik izleme, ağ ayarları, ping, IP tarama ve iperf3 hız testini tek pencerede, yan yana bölmelerde toplar. Yüksek veri hızında donmaz; Windows, macOS, Linux ve NVIDIA Jetson üzerinde kurulum gerektirmeden çalışır."
+ },
+ "BYSTerm is running from source; opening the release page.": {
+  "en": "BYSTerm is running from source; opening the release page.",
+  "tr": "BYSTerm kaynak koddan çalışıyor; sürüm sayfası açılıyor."
+ },
+ "BYSTerm yonetici olarak yeniden baslatilsin mi?\n(Acik baglantilar kapanir.)": {
+  "en": "Restart BYSTerm as administrator?\n(Open connections will be closed.)",
+  "tr": "BYSTerm yönetici olarak yeniden başlatılsın mı?\n(Açık bağlantılar kapanır.)"
+ },
+ "Baglan": {
+  "en": "Connect",
+  "tr": "Bağlan"
+ },
+ "Baglandi: ": {
+  "en": "Connected: ",
+  "tr": "Bağlandı: "
+ },
+ "Baglanti": {
+  "en": "Connection",
+  "tr": "Bağlantı"
+ },
+ "Baglanti hatasi: ": {
+  "en": "Connection error: ",
+  "tr": "Bağlantı hatası: "
+ },
+ "Baglanti kapatildi": {
+  "en": "Connection closed",
+  "tr": "Bağlantı kapatıldı"
+ },
+ "Baglanti reddedildi (karsida dinleyen yok)": {
+  "en": "Connection refused (nothing listening on the remote side)",
+  "tr": "Bağlantı reddedildi (karşıda dinleyen yok)"
+ },
+ "Baglanti reddedildi (karsida iperf3 sunucusu calismiyor mu? iperf3 -s)": {
+  "en": "Connection refused (is the iperf3 server not running on the remote side? iperf3 -s)",
+  "tr": "Bağlantı reddedildi (karşıda iperf3 sunucusu çalışmıyor mu? iperf3 -s)"
+ },
+ "Baglantiyi kes": {
+  "en": "Disconnect",
+  "tr": "Bağlantıyı kes"
+ },
+ "Bagli istemciler": {
+  "en": "Connected clients",
+  "tr": "Bağlı istemciler"
+ },
+ "Basarili. Liste yenileniyor (DHCP birkac saniye surebilir)...": {
+  "en": "Success. Refreshing list (DHCP may take a few seconds)...",
+  "tr": "Başarılı. Liste yenileniyor (DHCP birkaç saniye sürebilir)..."
+ },
+ "Baslat": {
+  "en": "Start",
+  "tr": "Başlat"
+ },
+ "Baslatilamadi: ": {
+  "en": "Could not start: ",
+  "tr": "Başlatılamadı: "
+ },
+ "Başlığı tutup sürükleyerek pencereyi taşıyın": {
+  "en": "Drag the title bar to move the pane",
+  "tr": "Başlığı tutup sürükleyerek pencereyi taşıyın"
+ },
+ "Bit": {
+  "en": "Bits",
+  "tr": "Bit"
+ },
+ "Bitti: ": {
+  "en": "Done: ",
+  "tr": "Bitti: "
+ },
+ "Bos IP bul": {
+  "en": "Find free IP",
+  "tr": "Boş IP bul"
+ },
+ "Bos IP bulunamadi (": {
+  "en": "No free IP found (",
+  "tr": "Boş IP bulunamadı ("
+ },
+ "Bos bolme\n\nSoldaki listeden bir arac secin\n(adina tiklayin: burada acilir,  + : yanina yeni bolme)": {
+  "en": "Empty pane\n\nPick a tool from the list on the left\n(click its name: opens here,  + : new pane next to it)",
+  "tr": "Boş bölme\n\nSoldaki listeden bir araç seçin\n(adına tıklayın: burada açılır,  + : yanına yeni bölme)"
+ },
+ "Boyut": {
+  "en": "Size",
+  "tr": "Boyut"
+ },
+ "Bu PC bekliyor. Karsi cihazdan:  iperf3 -c <bu PC IP> -p ": {
+  "en": "This PC is waiting. From the remote device:  iperf3 -c <this PC IP> -p ",
+  "tr": "Bu PC bekliyor. Karşı cihazdan:  iperf3 -c <bu PC IP> -p "
+ },
+ "Bu bilgisayarin IP adresleri: ": {
+  "en": "This computer's IP addresses: ",
+  "tr": "Bu bilgisayarın IP adresleri: "
+ },
+ "Bu karttaki ek IP adresleri": {
+  "en": "Extra IP addresses on this adapter",
+  "tr": "Bu karttaki ek IP adresleri"
+ },
+ "Bu sistemde ping atilamiyor": {
+  "en": "Cannot ping on this system",
+  "tr": "Bu sistemde ping atılamıyor"
+ },
+ "CANLI DINLEME (Linux/Jetson): Portu BASKA bir uygulama acsa bile (orn. minicom, kendi programiniz), o uygulamanin seri trafigini SANAL PORT OLMADAN burada gorursunuz; izlenen uygulama hic degismez, veriye dokunulmaz (pasif). Listeden uygulamayi secip baslatin. Yetki gerekirse yonetici izni istenir.": {
+  "en": "LIVE CAPTURE (Linux/Jetson): Even if ANOTHER application opens the port (e.g. minicom, your own program), you see that application's serial traffic here WITHOUT A VIRTUAL PORT; the monitored application is not changed at all and the data is not touched (passive). Select the application from the list and start. Admin rights are requested if needed.",
+  "tr": "CANLI DİNLEME (Linux/Jetson): Portu BAŞKA bir uygulama açsa bile (örn. minicom, kendi programınız), o uygulamanın seri trafiğini SANAL PORT OLMADAN burada görürsünüz; izlenen uygulama hiç değişmez, veriye dokunulmaz (pasif). Listeden uygulamayı seçip başlatın. Yetki gerekirse yönetici izni istenir."
+ },
+ "CIHAZ>": {
+  "en": "DEVICE>",
+  "tr": "CİHAZ>"
+ },
+ "Cancel": {
+  "en": "Cancel",
+  "tr": "İptal"
+ },
+ "Canli dinleme (calisan uygulamayi izle)": {
+  "en": "Live capture (monitor a running application)",
+  "tr": "Canlı dinleme (çalışan uygulamayı izle)"
+ },
+ "Canli dinleme yalnizca Linux/Jetson icin": {
+  "en": "Live capture is only available on Linux/Jetson",
+  "tr": "Canlı dinleme yalnızca Linux/Jetson için"
+ },
+ "Check for updates at startup": {
+  "en": "Check for updates at startup",
+  "tr": "Açılışta güncellemeleri kontrol et"
+ },
+ "Check for updates now": {
+  "en": "Check for updates now",
+  "tr": "Güncellemeleri şimdi kontrol et"
+ },
+ "Cift (E)": {
+  "en": "Even (E)",
+  "tr": "Çift (E)"
+ },
+ "Cift yonlu (--bidir) test desteklenmiyor": {
+  "en": "Bidirectional (--bidir) test is not supported",
+  "tr": "Çift yönlü (--bidir) test desteklenmiyor"
+ },
+ "Ciftler: ": {
+  "en": "Pairs: ",
+  "tr": "Çiftler: "
+ },
+ "Cihazin IP'sini yazin: ayni alt agda bos bir IP bulunup forma doldurulur.\nSonra \"Ek IP olarak ekle\" (internet bozulmaz) veya \"Uygula\".": {
+  "en": "Enter the device's IP: a free IP on the same subnet is found and filled into the form.\nThen \"Add as extra IP\" (internet stays intact) or \"Apply\".",
+  "tr": "Cihazın IP'sini yazın: aynı alt ağda boş bir IP bulunup forma doldurulur.\nSonra \"Ek IP olarak ekle\" (internet bozulmaz) veya \"Uygula\"."
+ },
+ "Cihazin bagli oldugu GERCEK port": {
+  "en": "The REAL port the device is connected to",
+  "tr": "Cihazın bağlı olduğu GERÇEK port"
+ },
+ "Cikarilan port: ": {
+  "en": "Removed port: ",
+  "tr": "Çıkarılan port: "
+ },
+ "Close": {
+  "en": "Close",
+  "tr": "Kapat"
+ },
+ "Could not check for updates: {err}": {
+  "en": "Could not check for updates: {err}",
+  "tr": "Güncelleme kontrol edilemedi: {err}"
+ },
+ "DHCP istemcisi bulunamadi (dhclient/dhcpcd/udhcpc)": {
+  "en": "No DHCP client found (dhclient/dhcpcd/udhcpc)",
+  "tr": "DHCP istemcisi bulunamadı (dhclient/dhcpcd/udhcpc)"
+ },
+ "Dark": {
+  "en": "Dark",
+  "tr": "Koyu"
+ },
+ "Developer": {
+  "en": "Developer",
+  "tr": "Geliştirici"
+ },
+ "Diger uygulama sanal portu hangi baud ile acarsa gercek port de o baud'a gecer (Linux/macOS)": {
+  "en": "Whatever baud rate the other application opens the virtual port with, the real port switches to it too (Linux/macOS)",
+  "tr": "Diğer uygulama sanal portu hangi baud ile açarsa gerçek port da o baud'a geçer (Linux/macOS)"
+ },
+ "Dinle": {
+  "en": "Listen",
+  "tr": "Dinle"
+ },
+ "Dinle ": {
+  "en": "Live ",
+  "tr": "Canlı "
+ },
+ "Dinleme basladi: pid ": {
+  "en": "Capture started: pid ",
+  "tr": "Dinleme başladı: pid "
+ },
+ "Dinleme hatasi: ": {
+  "en": "Listen error: ",
+  "tr": "Dinleme hatası: "
+ },
+ "Dinleme modunda gonderme yok (pasif)": {
+  "en": "No sending in listen mode (passive)",
+  "tr": "Dinleme modunda gönderme yok (pasif)"
+ },
+ "Dinleniyor: ": {
+  "en": "Listening: ",
+  "tr": "Dinleniyor: "
+ },
+ "Dosya gonder...": {
+  "en": "Send file...",
+  "tr": "Dosya gönder..."
+ },
+ "Dosya gonderiliyor: ": {
+  "en": "Sending file: ",
+  "tr": "Dosya gönderiliyor: "
+ },
+ "Dosya okunamadi: ": {
+  "en": "Could not read file: ",
+  "tr": "Dosya okunamadı: "
+ },
+ "Downloading {name}...": {
+  "en": "Downloading {name}...",
+  "tr": "{name} indiriliyor..."
+ },
+ "Duraklat": {
+  "en": "Pause",
+  "tr": "Duraklat"
+ },
+ "Durdur": {
+  "en": "Stop",
+  "tr": "Durdur"
+ },
+ "Durduruldu": {
+  "en": "Stopped",
+  "tr": "Durduruldu"
+ },
+ "Durum": {
+  "en": "Status",
+  "tr": "Durum"
+ },
+ "Durum degisince bip": {
+  "en": "Beep on status change",
+  "tr": "Durum değişince bip"
+ },
+ "Ek IP olarak ekle": {
+  "en": "Add as extra IP",
+  "tr": "Ek IP olarak ekle"
+ },
+ "Ek IP'ler": {
+  "en": "Extra IPs",
+  "tr": "Ek IP'ler"
+ },
+ "Ek IP'yi sil": {
+  "en": "Remove extra IP",
+  "tr": "Ek IP'yi sil"
+ },
+ "Ekran kaydedildi: ": {
+  "en": "View saved: ",
+  "tr": "Ekran kaydedildi: "
+ },
+ "Ekrani dondur (veri yine sayilir ve kaydedilir)": {
+  "en": "Freeze the view (data is still counted and recorded)",
+  "tr": "Ekranı dondur (veri yine sayılır ve kaydedilir)"
+ },
+ "Ekrani kaydet": {
+  "en": "Save view",
+  "tr": "Ekranı kaydet"
+ },
+ "Ekrani kaydet...": {
+  "en": "Save view...",
+  "tr": "Ekranı kaydet..."
+ },
+ "En fazla /16 taranabilir": {
+  "en": "At most a /16 can be scanned",
+  "tr": "En fazla /16 taranabilir"
+ },
+ "Erisim reddedildi": {
+  "en": "Access denied",
+  "tr": "Erişim reddedildi"
+ },
+ "Erisim reddedildi: ": {
+  "en": "Access denied: ",
+  "tr": "Erişim reddedildi: "
+ },
+ "Forma yukle": {
+  "en": "Load into form",
+  "tr": "Forma yükle"
+ },
+ "Formu kaydet...": {
+  "en": "Save form...",
+  "tr": "Formu kaydet..."
+ },
+ "Gateway": {
+  "en": "Gateway",
+  "tr": "Ağ geçidi"
+ },
+ "Gateway (": {
+  "en": "Gateway (",
+  "tr": "Ağ geçidi ("
+ },
+ "Gecerli bir cihaz IP'si girin": {
+  "en": "Enter a valid device IP",
+  "tr": "Geçerli bir cihaz IP'si girin"
+ },
+ "Gecersiz DNS: ": {
+  "en": "Invalid DNS: ",
+  "tr": "Geçersiz DNS: "
+ },
+ "Gecersiz IP: ": {
+  "en": "Invalid IP: ",
+  "tr": "Geçersiz IP: "
+ },
+ "Gecersiz aralik": {
+  "en": "Invalid range",
+  "tr": "Geçersiz aralık"
+ },
+ "Gecersiz aralik: ": {
+  "en": "Invalid range: ",
+  "tr": "Geçersiz aralık: "
+ },
+ "Gecersiz baud": {
+  "en": "Invalid baud rate",
+  "tr": "Geçersiz baud"
+ },
+ "Gecersiz gateway: ": {
+  "en": "Invalid gateway: ",
+  "tr": "Geçersiz ağ geçidi: "
+ },
+ "Gecersiz hex: \"": {
+  "en": "Invalid hex: \"",
+  "tr": "Geçersiz hex: \""
+ },
+ "Gecersiz maske: ": {
+  "en": "Invalid mask: ",
+  "tr": "Geçersiz maske: "
+ },
+ "Gelen/giden her seyi dosyaya yaz.\n.log/.txt = metin (zaman damgali, secili gorunumde)\n.bin = ham alinan baytlar (RX)": {
+  "en": "Write all incoming/outgoing data to a file.\n.log/.txt = text (timestamped, in the selected view)\n.bin = raw received bytes (RX)",
+  "tr": "Gelen/giden her şeyi dosyaya yaz.\n.log/.txt = metin (zaman damgalı, seçili görünümde)\n.bin = ham alınan baytlar (RX)"
+ },
+ "Gercek": {
+  "en": "Real",
+  "tr": "Gerçek"
+ },
+ "Gercek port ile sanal/ikinci port ayni olamaz": {
+  "en": "The real port and the virtual/second port cannot be the same",
+  "tr": "Gerçek port ile sanal/ikinci port aynı olamaz"
+ },
+ "Gercek port koptu: ": {
+  "en": "Real port disconnected: ",
+  "tr": "Gerçek port koptu: "
+ },
+ "Gercek porta yazma hatasi: ": {
+  "en": "Write error on real port: ",
+  "tr": "Gerçek porta yazma hatası: "
+ },
+ "Gomulu UART": {
+  "en": "Embedded UART",
+  "tr": "Gömülü UART"
+ },
+ "Gonder": {
+  "en": "Send",
+  "tr": "Gönder"
+ },
+ "Gonderen": {
+  "en": "Sender",
+  "tr": "Gönderen"
+ },
+ "Gonderilecek bagli istemci yok": {
+  "en": "No connected client to send to",
+  "tr": "Gönderilecek bağlı istemci yok"
+ },
+ "Gonderilecek dosya": {
+  "en": "File to send",
+  "tr": "Gönderilecek dosya"
+ },
+ "Gonderilecek veri (Enter = gonder)": {
+  "en": "Data to send (Enter = send)",
+  "tr": "Gönderilecek veri (Enter = gönder)"
+ },
+ "Gonderilen": {
+  "en": "Sent",
+  "tr": "Gönderilen"
+ },
+ "Gonderileni goster": {
+  "en": "Show sent",
+  "tr": "Gönderileni göster"
+ },
+ "Gonderme hatasi (": {
+  "en": "Send error (",
+  "tr": "Gönderme hatası ("
+ },
+ "Gonderme hatasi: ": {
+  "en": "Send error: ",
+  "tr": "Gönderme hatası: "
+ },
+ "Gorunum": {
+  "en": "View",
+  "tr": "Görünüm"
+ },
+ "Gunluge sadece durum degisimlerini yaz (cevap geldi / kesildi)": {
+  "en": "Log only status changes (reply received / lost)",
+  "tr": "Günlüğe sadece durum değişimlerini yaz (cevap geldi / kesildi)"
+ },
+ "HEX ornek: 01 03 00 00 00 0A C5 CD  veya 0103000A": {
+  "en": "HEX example: 01 03 00 00 00 0A C5 CD  or 0103000A",
+  "tr": "HEX örnek: 01 03 00 00 00 0A C5 CD  veya 0103000A"
+ },
+ "Hangi ag kartindan cikilsin (birden fazla Ethernet varsa)": {
+  "en": "Which network adapter to send from (if there is more than one Ethernet)",
+  "tr": "Hangi ağ kartından çıkılsın (birden fazla Ethernet varsa)"
+ },
+ "Hata: ": {
+  "en": "Error: ",
+  "tr": "Hata: "
+ },
+ "Hedef": {
+  "en": "Target",
+  "tr": "Hedef"
+ },
+ "Hedef adres/port girilmedi": {
+  "en": "No target address/port entered",
+  "tr": "Hedef adres/port girilmedi"
+ },
+ "Hedef hiz (-b). TCP: 0 = sinirsiz. UDP: zorunlu (varsayilan 100).": {
+  "en": "Target bitrate (-b). TCP: 0 = unlimited. UDP: required (default 100).",
+  "tr": "Hedef hız (-b). TCP: 0 = sınırsız. UDP: zorunlu (varsayılan 100)."
+ },
+ "Hedef(ler): 192.168.1.10, 192.168.1.20, google.com": {
+  "en": "Target(s): 192.168.1.10, 192.168.1.20, google.com",
+  "tr": "Hedef(ler): 192.168.1.10, 192.168.1.20, google.com"
+ },
+ "Hedef: ": {
+  "en": "Target: ",
+  "tr": "Hedef: "
+ },
+ "Hedef: tum istemciler": {
+  "en": "Target: all clients",
+  "tr": "Hedef: tüm istemciler"
+ },
+ "Henuz cift yok — olusturun.": {
+  "en": "No pairs yet — create one.",
+  "tr": "Henüz çift yok — oluşturun."
+ },
+ "Hiz": {
+  "en": "Speed",
+  "tr": "Hız"
+ },
+ "Host adi": {
+  "en": "Hostname",
+  "tr": "Host adı"
+ },
+ "IP Tarama": {
+  "en": "IP Scan",
+  "tr": "IP Tarama"
+ },
+ "IP adresi": {
+  "en": "IP address",
+  "tr": "IP adresi"
+ },
+ "IP araligi": {
+  "en": "Range",
+  "tr": "IP aralığı"
+ },
+ "IP veya host adi": {
+  "en": "IP or hostname",
+  "tr": "IP veya host adı"
+ },
+ "IP yok": {
+  "en": "No IP",
+  "tr": "IP yok"
+ },
+ "IPv4 adres(ler)": {
+  "en": "IPv4 address(es)",
+  "tr": "IPv4 adres(ler)"
+ },
+ "Ikinci port (B)": {
+  "en": "Second port (B)",
+  "tr": "İkinci port (B)"
+ },
+ "Ikinci port koptu: ": {
+  "en": "Second port disconnected: ",
+  "tr": "İkinci port koptu: "
+ },
+ "Indirme bir ZIP degil (SourceForge ara sayfasi gelmis olabilir). Lutfen com0com.sourceforge.net adresinden elle kurun.": {
+  "en": "The download is not a ZIP (a SourceForge intermediate page may have been returned). Please install manually from com0com.sourceforge.net.",
+  "tr": "İndirme bir ZIP değil (SourceForge ara sayfası gelmiş olabilir). Lütfen com0com.sourceforge.net adresinden elle kurun."
+ },
+ "Iptal": {
+  "en": "Cancel",
+  "tr": "İptal"
+ },
+ "Iptal edildi (UAC onaylanmadi)": {
+  "en": "Cancelled (UAC not approved)",
+  "tr": "İptal edildi (UAC onaylanmadı)"
+ },
+ "Iptal edildi (UAC)": {
+  "en": "Cancelled (UAC)",
+  "tr": "İptal edildi (UAC)"
+ },
+ "Iptal edildi (yetki verilmedi)": {
+  "en": "Cancelled (permission not granted)",
+  "tr": "İptal edildi (yetki verilmedi)"
+ },
+ "Iptal edildi (yonetici sifresi girilmedi)": {
+  "en": "Cancelled (administrator password not entered)",
+  "tr": "İptal edildi (yönetici şifresi girilmedi)"
+ },
+ "Iptal edildi veya yetki verilmedi": {
+  "en": "Cancelled or permission not granted",
+  "tr": "İptal edildi veya yetki verilmedi"
+ },
+ "Isaretliyse hedef, en son paket gelen adres:port olur": {
+  "en": "If checked, the target becomes the address:port of the last received packet",
+  "tr": "İşaretliyse hedef, en son paket gelen adres:port olur"
+ },
+ "Isaretliyse karsi taraf GONDERIR, bu PC alir (indirme yonu)": {
+  "en": "If checked, the remote side SENDS and this PC receives (download direction)",
+  "tr": "İşaretliyse karşı taraf GÖNDERİR, bu PC alır (indirme yönü)"
+ },
+ "Istemci (karsiya baglan)": {
+  "en": "Client (connect to remote)",
+  "tr": "İstemci (karşıya bağlan)"
+ },
+ "Istemci ayrildi: ": {
+  "en": "Client disconnected: ",
+  "tr": "İstemci ayrıldı: "
+ },
+ "Istemci baglandi: ": {
+  "en": "Client connected: ",
+  "tr": "İstemci bağlandı: "
+ },
+ "Izleme ": {
+  "en": "Monitor ",
+  "tr": "İzleme "
+ },
+ "Izleme basladi: ": {
+  "en": "Monitoring started: ",
+  "tr": "İzleme başladı: "
+ },
+ "Izleme bitti (surec kapandi, pid ": {
+  "en": "Monitoring ended (process exited, pid ",
+  "tr": "İzleme bitti (süreç kapandı, pid "
+ },
+ "Izlemeyi baslat": {
+  "en": "Start monitoring",
+  "tr": "İzlemeyi başlat"
+ },
+ "Izlenecek uygulamayi secin (seri port acmis bir surec)": {
+  "en": "Select the application to monitor (a process with an open serial port)",
+  "tr": "İzlenecek uygulamayı seçin (seri port açmış bir süreç)"
+ },
+ "JSON cok buyuk": {
+  "en": "JSON too large",
+  "tr": "JSON çok büyük"
+ },
+ "Kapali": {
+  "en": "Closed",
+  "tr": "Kapalı"
+ },
+ "Kapat": {
+  "en": "Close",
+  "tr": "Kapat"
+ },
+ "Kapat  (Ctrl+Shift+W)": {
+  "en": "Close  (Ctrl+Shift+W)",
+  "tr": "Kapat  (Ctrl+Shift+W)"
+ },
+ "Kapatiliyor...": {
+  "en": "Closing...",
+  "tr": "Kapatılıyor..."
+ },
+ "Kapatma hatasi: ": {
+  "en": "Close error: ",
+  "tr": "Kapatma hatası: "
+ },
+ "Karsi cihazda iperf3 sunucusu calismali:  iperf3 -s   (Jetson/Ubuntu: sudo apt install iperf3).  Ya da karsi PC'de BYSTerm > iPerf > Sunucu.  Olculen, iki uc arasindan GERCEKTEN gecen net hizdir.": {
+  "en": "An iperf3 server must be running on the remote device:  iperf3 -s   (Jetson/Ubuntu: sudo apt install iperf3).  Or on the remote PC: BYSTerm > iPerf > Server.  The result is the net throughput that ACTUALLY passes between the two ends.",
+  "tr": "Karşı cihazda iperf3 sunucusu çalışmalı:  iperf3 -s   (Jetson/Ubuntu: sudo apt install iperf3).  Ya da karşı PC'de BYSTerm > iPerf > Sunucu.  Ölçülen, iki uç arasından GERÇEKTEN geçen net hızdır."
+ },
+ "Karsi taraf baglantiyi kapatti": {
+  "en": "Remote side closed the connection",
+  "tr": "Karşı taraf bağlantıyı kapattı"
+ },
+ "Kaydedilemedi: ": {
+  "en": "Could not save: ",
+  "tr": "Kaydedilemedi: "
+ },
+ "Kayip": {
+  "en": "Loss",
+  "tr": "Kayıp"
+ },
+ "Kayit basladi: ": {
+  "en": "Recording started: ",
+  "tr": "Kayıt başladı: "
+ },
+ "Kayit dosyasi": {
+  "en": "Log file",
+  "tr": "Kayıt dosyası"
+ },
+ "Kayit dosyasi acilamadi: ": {
+  "en": "Could not open log file: ",
+  "tr": "Kayıt dosyası açılamadı: "
+ },
+ "Kayit durduruldu": {
+  "en": "Recording stopped",
+  "tr": "Kayıt durduruldu"
+ },
+ "Kaynak": {
+  "en": "Source",
+  "tr": "Kaynak"
+ },
+ "Kontrol karakteri <XX>": {
+  "en": "Control chars <XX>",
+  "tr": "Kontrol karakteri <XX>"
+ },
+ "Kopyalandi: ": {
+  "en": "Copied: ",
+  "tr": "Kopyalandı: "
+ },
+ "Kullanici durdurdu; sonuclar aliniyor...": {
+  "en": "Stopped by user; fetching results...",
+  "tr": "Kullanıcı durdurdu; sonuçlar alınıyor..."
+ },
+ "Kurulum baslatilamadi (": {
+  "en": "Could not start installer (",
+  "tr": "Kurulum başlatılamadı ("
+ },
+ "Kurulum calisiyor (UAC onayi gerekebilir)...": {
+  "en": "Installer running (UAC approval may be required)...",
+  "tr": "Kurulum çalışıyor (UAC onayı gerekebilir)..."
+ },
+ "Kurulum tamamlandi (yeniden tarayin)": {
+  "en": "Installation complete (rescan)",
+  "tr": "Kurulum tamamlandı (yeniden tarayın)"
+ },
+ "Language": {
+  "en": "Language",
+  "tr": "Dil"
+ },
+ "Later": {
+  "en": "Later",
+  "tr": "Sonra"
+ },
+ "Light": {
+  "en": "Light",
+  "tr": "Açık"
+ },
+ "Listeden secilen ek IP adresini karttan kaldir": {
+  "en": "Remove the selected extra IP address from the adapter",
+  "tr": "Listeden seçilen ek IP adresini karttan kaldır"
+ },
+ "Mark (M)": {
+  "en": "Mark (M)",
+  "tr": "İşaret (M)"
+ },
+ "Maske": {
+  "en": "Mask",
+  "tr": "Maske"
+ },
+ "Metin (*.txt *.log);;Tum dosyalar (*)": {
+  "en": "Text (*.txt *.log);;All files (*)",
+  "tr": "Metin (*.txt *.log);;Tüm dosyalar (*)"
+ },
+ "Metin kayit (*.log *.txt);;Ham RX baytlari (*.bin);;Tum dosyalar (*)": {
+  "en": "Text log (*.log *.txt);;Raw RX bytes (*.bin);;All files (*)",
+  "tr": "Metin kayıt (*.log *.txt);;Ham RX baytları (*.bin);;Tüm dosyalar (*)"
+ },
+ "Mevcut IP ve internet bozulmadan bu IP'yi karta EK olarak ekler\n(cihazin alt agina ulasmak icin en pratik yol)": {
+  "en": "Adds this IP to the adapter as an EXTRA address without disturbing the current IP and internet\n(the easiest way to reach the device's subnet)",
+  "tr": "Mevcut IP ve internet bozulmadan bu IP'yi karta EK olarak ekler\n(cihazın alt ağına ulaşmak için en pratik yol)"
+ },
+ "Mod": {
+  "en": "Mode",
+  "tr": "Mod"
+ },
+ "Nasil calisir (Windows): Bir sanal null-modem cifti gerekir (ucretsiz com0com: orn. COM11<->COM12). BYSTerm gercek portu ve ciftin BIR ucunu (COM11) acar; izlediginiz uygulamada ciftin OBUR ucunu (COM12) acin. Trafik iki yonde iletilir ve gorunur.": {
+  "en": "How it works (Windows): A virtual null-modem pair is required (free com0com: e.g. COM11<->COM12). BYSTerm opens the real port and ONE end of the pair (COM11); in the application you are monitoring, open the OTHER end of the pair (COM12). Traffic is forwarded in both directions and shown here.",
+  "tr": "Nasıl çalışır (Windows): Bir sanal null-modem çifti gerekir (ücretsiz com0com: örn. COM11<->COM12). BYSTerm gerçek portu ve çiftin BİR ucunu (COM11) açar; izlediğiniz uygulamada çiftin ÖBÜR ucunu (COM12) açın. Trafik iki yönde iletilir ve görünür."
+ },
+ "Nasil calisir: BYSTerm gercek portu acar ve bir SANAL port olusturur (yukaridaki yol, orn. /tmp/ttyV0). Izlemek istediginiz uygulamada gercek port yerine bu sanal portu acin; iki yondeki tum trafik burada gorunur ve oldugu gibi iletilir. (Gercek port zaten baska uygulamada aciksa once onu kapatin.)": {
+  "en": "How it works: BYSTerm opens the real port and creates a VIRTUAL port (the path above, e.g. /tmp/ttyV0). In the application you want to monitor, open this virtual port instead of the real port; all traffic in both directions is shown here and forwarded unchanged. (If the real port is already open in another application, close it there first.)",
+  "tr": "Nasıl çalışır: BYSTerm gerçek portu açar ve bir SANAL port oluşturur (yukarıdaki yol, örn. /tmp/ttyV0). İzlemek istediğiniz uygulamada gerçek port yerine bu sanal portu açın; iki yöndeki tüm trafik burada görünür ve olduğu gibi iletilir. (Gerçek port zaten başka uygulamada açıksa önce onu kapatın.)"
+ },
+ "NetworkManager yok: ayar GECICIDIR (yeniden baslatinca gider).": {
+  "en": "No NetworkManager: the setting is TEMPORARY (lost on reboot).",
+  "tr": "NetworkManager yok: ayar GEÇİCİDİR (yeniden başlatınca gider)."
+ },
+ "No download for this system was found in the release. Opening the release page.": {
+  "en": "No download for this system was found in the release. Opening the release page.",
+  "tr": "Bu sürümde sisteminize uygun dosya bulunamadı. Sürüm sayfası açılıyor."
+ },
+ "No write permission for {path}. Download the new version manually from the release page.": {
+  "en": "No write permission for {path}. Download the new version manually from the release page.",
+  "tr": "{path} için yazma izni yok. Yeni sürümü sürüm sayfasından elle indirin."
+ },
+ "Okunuyor...": {
+  "en": "Reading...",
+  "tr": "Okunuyor..."
+ },
+ "Once baglanti acin": {
+  "en": "Open a connection first",
+  "tr": "Önce bağlantı açın"
+ },
+ "Once listeden bir arayuz secin": {
+  "en": "Select an interface from the list first",
+  "tr": "Önce listeden bir arayüz seçin"
+ },
+ "Onerilen: ": {
+  "en": "Suggested: ",
+  "tr": "Önerilen: "
+ },
+ "Ort": {
+  "en": "Avg",
+  "tr": "Ort"
+ },
+ "Oto-kaydir": {
+  "en": "Auto-scroll",
+  "tr": "Oto-kaydır"
+ },
+ "Otomatik": {
+  "en": "Automatic",
+  "tr": "Otomatik"
+ },
+ "Otomatik (DHCP)": {
+  "en": "Automatic (DHCP)",
+  "tr": "Otomatik (DHCP)"
+ },
+ "Otomatik IP: cihazin agina gec": {
+  "en": "Auto IP: join the device's network",
+  "tr": "Otomatik IP: cihazın ağına geç"
+ },
+ "Oturum": {
+  "en": "Session",
+  "tr": "Oturum"
+ },
+ "PASIF DINLEME: Iki gercek port ayni baud ile acilir ve SADECE dinlenir. A = ustteki port (orn. cihazin TX hatti), B = bu port (orn. cihazin RX hatti). Ceviricilerin GND'lerini hatta baglamayi unutmayin.": {
+  "en": "PASSIVE LISTEN: Two real ports are opened at the same baud rate and ONLY listened to. A = the port above (e.g. the device's TX line), B = this port (e.g. the device's RX line). Don't forget to connect the converters' GNDs to the line.",
+  "tr": "PASİF DİNLEME: İki gerçek port aynı baud ile açılır ve SADECE dinlenir. A = üstteki port (örn. cihazın TX hattı), B = bu port (örn. cihazın RX hattı). Çeviricilerin GND'lerini hatta bağlamayı unutmayın."
+ },
+ "PASIF DONANIM TAP: Iki USB-seri cevirici; A = ustteki port, B = asagidaki ikinci port, RX uclari izlenen hattin TX ve RX'ine baglanir. BYSTerm ikisini de sadece dinler. GND'leri ortak baglayin.": {
+  "en": "PASSIVE HARDWARE TAP: Two USB-serial converters; A = the port above, B = the second port below; their RX pins are connected to the TX and RX of the monitored line. BYSTerm only listens on both. Connect the GNDs together.",
+  "tr": "PASİF DONANIM TAP: İki USB-seri çevirici; A = üstteki port, B = aşağıdaki ikinci port, RX uçları izlenen hattın TX ve RX'ine bağlanır. BYSTerm ikisini de sadece dinler. GND'leri ortak bağlayın."
+ },
+ "Paralel": {
+  "en": "Parallel",
+  "tr": "Paralel"
+ },
+ "Paralel akis sayisi (-P). 10G aglarda 4-8 deneyin.": {
+  "en": "Number of parallel streams (-P). Try 4-8 on 10G networks.",
+  "tr": "Paralel akış sayısı (-P). 10G ağlarda 4-8 deneyin."
+ },
+ "Parity": {
+  "en": "Parity",
+  "tr": "Parite"
+ },
+ "Pasif dinleme: A=": {
+  "en": "Passive listen: A=",
+  "tr": "Pasif dinleme: A="
+ },
+ "Pasif donanim tap (2 port)": {
+  "en": "Passive hardware tap (2 ports)",
+  "tr": "Pasif donanım tap (2 port)"
+ },
+ "Pencere duzenini sifirla": {
+  "en": "Reset window layout",
+  "tr": "Pencere düzenini sıfırla"
+ },
+ "Ping sekmesine ekle": {
+  "en": "Add to Ping tab",
+  "tr": "Ping sekmesine ekle"
+ },
+ "Port baglantisi koptu: ": {
+  "en": "Port connection lost: ",
+  "tr": "Port bağlantısı koptu: "
+ },
+ "Port listesini simdi yenile (liste zaten otomatik yenilenir)": {
+  "en": "Refresh the port list now (the list also refreshes automatically)",
+  "tr": "Port listesini şimdi yenile (liste zaten otomatik yenilenir)"
+ },
+ "Port sec veya yaz (COM3, /dev/ttyUSB0)": {
+  "en": "Select or type a port (COM3, /dev/ttyUSB0)",
+  "tr": "Port seç veya yaz (COM3, /dev/ttyUSB0)"
+ },
+ "Port secilmedi": {
+  "en": "No port selected",
+  "tr": "Port seçilmedi"
+ },
+ "Port yok": {
+  "en": "No ports",
+  "tr": "Port yok"
+ },
+ "PowerShell cikti vermedi: ": {
+  "en": "PowerShell returned no output: ",
+  "tr": "PowerShell çıktı vermedi: "
+ },
+ "Prefix 0-32 olmali": {
+  "en": "Prefix must be 0-32",
+  "tr": "Prefix 0-32 olmalı"
+ },
+ "Profil adi (ornek: Jetson agi):": {
+  "en": "Profile name (e.g. Jetson network):",
+  "tr": "Profil adı (örnek: Jetson ağı):"
+ },
+ "Profil forma yuklendi: ": {
+  "en": "Profile loaded into form: ",
+  "tr": "Profil forma yüklendi: "
+ },
+ "Profil kaydedildi: ": {
+  "en": "Profile saved: ",
+  "tr": "Profil kaydedildi: "
+ },
+ "Profil kaydet": {
+  "en": "Save profile",
+  "tr": "Profil kaydet"
+ },
+ "Profiller (kayitli ayarlar)": {
+  "en": "Profiles (saved settings)",
+  "tr": "Profiller (kayıtlı ayarlar)"
+ },
+ "Protokol": {
+  "en": "Protocol",
+  "tr": "Protokol"
+ },
+ "Restart BYSTerm to apply the new language.": {
+  "en": "Restart BYSTerm to apply the new language.",
+  "tr": "Yeni dil, BYSTerm yeniden başlatılınca geçerli olur."
+ },
+ "Restart now?": {
+  "en": "Restart now?",
+  "tr": "Şimdi yeniden başlatılsın mı?"
+ },
+ "SONUC": {
+  "en": "RESULT",
+  "tr": "SONUÇ"
+ },
+ "Sag tik: kopyala / Ping'e ekle / bu cihazin agina gec.  Cift tik: IP kopyala.": {
+  "en": "Right-click: copy / add to Ping / join this device's network.  Double-click: copy IP.",
+  "tr": "Sağ tık: kopyala / Ping'e ekle / bu cihazın ağına geç.  Çift tık: IP kopyala."
+ },
+ "Sanal / ikinci port belirtin": {
+  "en": "Specify a virtual / second port",
+  "tr": "Sanal / ikinci port belirtin"
+ },
+ "Sanal arayuzleri de goster (VPN, Docker, Hyper-V...)": {
+  "en": "Also show virtual interfaces (VPN, Docker, Hyper-V...)",
+  "tr": "Sanal arayüzleri de göster (VPN, Docker, Hyper-V...)"
+ },
+ "Sanal port": {
+  "en": "Virtual port",
+  "tr": "Sanal port"
+ },
+ "Sanal port hatasi: ": {
+  "en": "Virtual port error: ",
+  "tr": "Sanal port hatası: "
+ },
+ "Sanal port koprusu": {
+  "en": "Virtual port bridge",
+  "tr": "Sanal port köprüsü"
+ },
+ "Sanal port surucusu kur (com0com)": {
+  "en": "Install virtual port driver (com0com)",
+  "tr": "Sanal port sürücüsü kur (com0com)"
+ },
+ "Sanal porta yazma hatasi: ": {
+  "en": "Write error on virtual port: ",
+  "tr": "Sanal porta yazma hatası: "
+ },
+ "Sanal/ikinci port belirtilmedi": {
+  "en": "No virtual/second port specified",
+  "tr": "Sanal/ikinci port belirtilmedi"
+ },
+ "Sayac sifirla": {
+  "en": "Reset counters",
+  "tr": "Sayaç sıfırla"
+ },
+ "Sayi": {
+  "en": "Count",
+  "tr": "Sayı"
+ },
+ "Sağa ▶": {
+  "en": "Right ▶",
+  "tr": "Sağa ▶"
+ },
+ "Secili arayuz": {
+  "en": "Selected interface",
+  "tr": "Seçili arayüz"
+ },
+ "Secili arayuz: ": {
+  "en": "Selected interface: ",
+  "tr": "Seçili arayüz: "
+ },
+ "Secim yoksa gonderim TUM istemcilere gider": {
+  "en": "With no selection, data is sent to ALL clients",
+  "tr": "Seçim yoksa gönderim TÜM istemcilere gider"
+ },
+ "Secimi kaldir": {
+  "en": "Clear selection",
+  "tr": "Seçimi kaldır"
+ },
+ "Seri": {
+  "en": "Serial",
+  "tr": "Seri"
+ },
+ "Seri ": {
+  "en": "Serial ",
+  "tr": "Seri "
+ },
+ "Seri Izleme": {
+  "en": "Serial Monitor",
+  "tr": "Seri İzleme"
+ },
+ "Seri izleme icin bir kez kurulur (ucretsiz).": {
+  "en": "Installed once for serial monitoring (free).",
+  "tr": "Seri izleme için bir kez kurulur (ücretsiz)."
+ },
+ "Seri no": {
+  "en": "Serial no.",
+  "tr": "Seri no"
+ },
+ "Seri port acmis uygulamalari yeniden tara": {
+  "en": "Rescan applications with an open serial port",
+  "tr": "Seri port açmış uygulamaları yeniden tara"
+ },
+ "Seri port izni": {
+  "en": "Serial port access",
+  "tr": "Seri port izni"
+ },
+ "Seri portlar: ": {
+  "en": "Serial ports: ",
+  "tr": "Seri portlar: "
+ },
+ "Serial · TCP · UDP · Network toolkit": {
+  "en": "Serial · TCP · UDP · Network toolkit",
+  "tr": "Seri · TCP · UDP · Ağ araç kutusu"
+ },
+ "Settings": {
+  "en": "Settings",
+  "tr": "Ayarlar"
+ },
+ "Show startup animation": {
+  "en": "Show startup animation",
+  "tr": "Açılış animasyonunu göster"
+ },
+ "Sil": {
+  "en": "Delete",
+  "tr": "Sil"
+ },
+ "Skip this version": {
+  "en": "Skip this version",
+  "tr": "Bu sürümü atla"
+ },
+ "Son": {
+  "en": "Last",
+  "tr": "Son"
+ },
+ "Son gonderene yanitla": {
+  "en": "Reply to last sender",
+  "tr": "Son gönderene yanıtla"
+ },
+ "Sonek yok": {
+  "en": "None",
+  "tr": "Sonek yok"
+ },
+ "Source code & releases": {
+  "en": "Source code & releases",
+  "tr": "Kaynak kod ve sürümler"
+ },
+ "Space (S)": {
+  "en": "Space (S)",
+  "tr": "Boşluk (S)"
+ },
+ "Statik": {
+  "en": "Static",
+  "tr": "Statik"
+ },
+ "Statik IP": {
+  "en": "Static IP",
+  "tr": "Statik IP"
+ },
+ "Stop": {
+  "en": "Stop",
+  "tr": "Stop biti"
+ },
+ "Sunucu": {
+  "en": "Server",
+  "tr": "Sunucu"
+ },
+ "Sunucu (bekle)": {
+  "en": "Server (wait)",
+  "tr": "Sunucu (bekle)"
+ },
+ "Sunucu adresi girin": {
+  "en": "Enter a server address",
+  "tr": "Sunucu adresi girin"
+ },
+ "Sunucu adresini girin": {
+  "en": "Enter the server address",
+  "tr": "Sunucu adresini girin"
+ },
+ "Sunucu hatasi (iperf hata ": {
+  "en": "Server error (iperf error ",
+  "tr": "Sunucu hatası (iperf hata "
+ },
+ "Sunucu mesgul (baska bir test calisiyor)": {
+  "en": "Server busy (another test is running)",
+  "tr": "Sunucu meşgul (başka bir test çalışıyor)"
+ },
+ "Sunucu testi sonlandirdi": {
+  "en": "Server ended the test",
+  "tr": "Sunucu testi sonlandırdı"
+ },
+ "Sure": {
+  "en": "Duration",
+  "tr": "Süre"
+ },
+ "Surec kapanmis (pid ": {
+  "en": "Process has exited (pid ",
+  "tr": "Süreç kapanmış (pid "
+ },
+ "TCP Istemci": {
+  "en": "TCP Client",
+  "tr": "TCP İstemci"
+ },
+ "TCP Istemci hedefi yap": {
+  "en": "Set as TCP Client target",
+  "tr": "TCP İstemci hedefi yap"
+ },
+ "TCP Sunucu": {
+  "en": "TCP Server",
+  "tr": "TCP Sunucu"
+ },
+ "TCP Sunucu :": {
+  "en": "TCP Server :",
+  "tr": "TCP Sunucu :"
+ },
+ "TTL (tahmini sistem)": {
+  "en": "TTL (estimated OS)",
+  "tr": "TTL (tahmini sistem)"
+ },
+ "TTL asildi": {
+  "en": "TTL exceeded",
+  "tr": "TTL aşıldı"
+ },
+ "Tam ekran / geri al  (Ctrl+Shift+X)": {
+  "en": "Fullscreen / restore  (Ctrl+Shift+X)",
+  "tr": "Tam ekran / geri al  (Ctrl+Shift+X)"
+ },
+ "Tara": {
+  "en": "Scan",
+  "tr": "Tara"
+ },
+ "Tek (O)": {
+  "en": "Odd (O)",
+  "tr": "Tek (O)"
+ },
+ "Tek sayida hex hane: \"": {
+  "en": "Odd number of hex digits: \"",
+  "tr": "Tek sayıda hex hane: \""
+ },
+ "Tekrar": {
+  "en": "Repeat",
+  "tr": "Tekrar"
+ },
+ "Temizle": {
+  "en": "Clear",
+  "tr": "Temizle"
+ },
+ "Ters yon (-R)": {
+  "en": "Reverse (-R)",
+  "tr": "Ters yön (-R)"
+ },
+ "The update was installed. BYSTerm will now restart.": {
+  "en": "The update was installed. BYSTerm will now restart.",
+  "tr": "Güncelleme kuruldu. BYSTerm yeniden başlatılıyor."
+ },
+ "Theme": {
+  "en": "Theme",
+  "tr": "Tema"
+ },
+ "UDP akisi kurulamadi (sunucu cevap vermedi / firewall?)": {
+  "en": "Could not set up UDP stream (server did not respond / firewall?)",
+  "tr": "UDP akışı kurulamadı (sunucu cevap vermedi / firewall?)"
+ },
+ "UDP dinleniyor: ": {
+  "en": "UDP listening: ",
+  "tr": "UDP dinleniyor: "
+ },
+ "UDP hatasi: ": {
+  "en": "UDP error: ",
+  "tr": "UDP hatası: "
+ },
+ "UYGUL>": {
+  "en": "APP>",
+  "tr": "UYGUL>"
+ },
+ "Update available": {
+  "en": "Update available",
+  "tr": "Güncelleme var"
+ },
+ "Update failed": {
+  "en": "Update failed",
+  "tr": "Güncelleme başarısız"
+ },
+ "Update now": {
+  "en": "Update now",
+  "tr": "Şimdi güncelle"
+ },
+ "Uretici": {
+  "en": "Manufacturer",
+  "tr": "Üretici"
+ },
+ "Uygula": {
+  "en": "Apply",
+  "tr": "Uygula"
+ },
+ "Uygulama": {
+  "en": "Application",
+  "tr": "Uygulama"
+ },
+ "Uygulama port ayarini degistirdi -> gercek port: ": {
+  "en": "Application changed port settings -> real port: ",
+  "tr": "Uygulama port ayarını değiştirdi -> gerçek port: "
+ },
+ "Uygulama sanal portu acti": {
+  "en": "Application opened the virtual port",
+  "tr": "Uygulama sanal portu açtı"
+ },
+ "Uygulama sanal portu kapatti": {
+  "en": "Application closed the virtual port",
+  "tr": "Uygulama sanal portu kapattı"
+ },
+ "Uygulama veriyi okumuyor; ": {
+  "en": "Application is not reading data; ",
+  "tr": "Uygulama veriyi okumuyor; "
+ },
+ "Uygulamanin ayari (": {
+  "en": "Could not apply the application's setting (",
+  "tr": "Uygulamanın ayarı ("
+ },
+ "Uygulamanin baud/format ayarini takip et": {
+  "en": "Follow the application's baud/format settings",
+  "tr": "Uygulamanın baud/format ayarını takip et"
+ },
+ "Uygulaniyor: ": {
+  "en": "Applying: ",
+  "tr": "Uygulanıyor: "
+ },
+ "What&#39;s new:": {
+  "en": "What&#39;s new:",
+  "tr": "Yenilikler:"
+ },
+ "Windows: uygulama yonetici olarak calistirilir": {
+  "en": "Windows: the application is run as administrator",
+  "tr": "Windows: uygulama yönetici olarak çalıştırılır"
+ },
+ "Yalniz Windows": {
+  "en": "Windows only",
+  "tr": "Yalnız Windows"
+ },
+ "Yana bol  (Ctrl+Shift+E)": {
+  "en": "Split right  (Ctrl+Shift+E)",
+  "tr": "Yana böl  (Ctrl+Shift+E)"
+ },
+ "Yanit suresi": {
+  "en": "Response time",
+  "tr": "Yanıt süresi"
+ },
+ "Yazma hatasi: ": {
+  "en": "Write error: ",
+  "tr": "Yazma hatası: "
+ },
+ "Yazma zaman asimi (akis kontrolu karsi tarafca durdurulmus olabilir)": {
+  "en": "Write timeout (flow control may have been paused by the other side)",
+  "tr": "Yazma zaman aşımı (akış kontrolü karşı tarafça durdurulmuş olabilir)"
+ },
+ "Yeni ": {
+  "en": "New ",
+  "tr": "Yeni "
+ },
+ "Yeni port: ": {
+  "en": "New port: ",
+  "tr": "Yeni port: "
+ },
+ "Yeni sanal port cifti olustur": {
+  "en": "Create new virtual port pair",
+  "tr": "Yeni sanal port çifti oluştur"
+ },
+ "Yeni {t}: aktif bolmenin YANINA ac (Terminator gibi)": {
+  "en": "New {t}: open NEXT TO the active pane (like Terminator)",
+  "tr": "Yeni {t}: aktif bölmenin YANINA aç (Terminator gibi)"
+ },
+ "Yerel": {
+  "en": "Local",
+  "tr": "Yerel"
+ },
+ "Yetki yok (ptrace). BYSTerm'i sudo ile acin ya da yonetici izni verin.": {
+  "en": "No permission (ptrace). Start BYSTerm with sudo or grant admin rights.",
+  "tr": "Yetki yok (ptrace). BYSTerm'i sudo ile açın ya da yönetici izni verin."
+ },
+ "Yok": {
+  "en": "None",
+  "tr": "Yok"
+ },
+ "Yok (N)": {
+  "en": "None (N)",
+  "tr": "Yok (N)"
+ },
+ "Yonetici izni": {
+  "en": "Admin rights",
+  "tr": "Yönetici izni"
+ },
+ "Yonetici izni ver": {
+  "en": "Grant admin rights",
+  "tr": "Yönetici izni ver"
+ },
+ "Yonetici izni verilmedi (": {
+  "en": "Admin rights not granted (",
+  "tr": "Yönetici izni verilmedi ("
+ },
+ "Yonetici iznini simdi iste": {
+  "en": "Request admin rights now",
+  "tr": "Yönetici iznini şimdi iste"
+ },
+ "Yonetici olarak calistirilamadi (hata ": {
+  "en": "Could not run as administrator (error ",
+  "tr": "Yönetici olarak çalıştırılamadı (hata "
+ },
+ "Yonetici yetkisi gerekli ve pkexec bulunamadi. BYSTerm'i \"sudo\" ile calistirin veya su komutlari elle calistirin:\n": {
+  "en": "Administrator rights are required and pkexec was not found. Run BYSTerm with \"sudo\" or run these commands manually:\n",
+  "tr": "Yönetici yetkisi gerekli ve pkexec bulunamadı. BYSTerm'i \"sudo\" ile çalıştırın veya şu komutları elle çalıştırın:\n"
+ },
+ "Yontem": {
+  "en": "Method",
+  "tr": "Yöntem"
+ },
+ "You are using the latest version ({cur}).": {
+  "en": "You are using the latest version ({cur}).",
+  "tr": "En güncel sürümü kullanıyorsunuz ({cur})."
+ },
+ "ZIP degil": {
+  "en": "Not a ZIP",
+  "tr": "ZIP değil"
+ },
+ "Zaman asimi": {
+  "en": "Timeout",
+  "tr": "Zaman aşımı"
+ },
+ "Zaman asimi (adres/port/firewall?)": {
+  "en": "Timeout (address/port/firewall?)",
+  "tr": "Zaman aşımı (adres/port/firewall?)"
+ },
+ "Zaman damgasi": {
+  "en": "Timestamps",
+  "tr": "Zaman damgası"
+ },
+ "\\ kacis": {
+  "en": "\\ escapes",
+  "tr": "\\ kaçış"
+ },
+ "ag erisilemez": {
+  "en": "network unreachable",
+  "tr": "ağ erişilemez"
+ },
+ "alt ag dolu?": {
+  "en": "subnet full?",
+  "tr": "alt ağ dolu?"
+ },
+ "arsivde BYSTerm yok": {
+  "en": "BYSTerm not found in the archive",
+  "tr": "arşivde BYSTerm yok"
+ },
+ "baglanti kapandi": {
+  "en": "connection closed",
+  "tr": "bağlantı kapandı"
+ },
+ "beklenmeyen durum: ": {
+  "en": "unexpected state: ",
+  "tr": "beklenmeyen durum: "
+ },
+ "bos birakilabilir": {
+  "en": "may be left empty",
+  "tr": "boş bırakılabilir"
+ },
+ "chmod sadece seri port cihazlari icin": {
+  "en": "chmod is only allowed for serial port devices",
+  "tr": "chmod sadece seri port cihazları için"
+ },
+ "cift olusturuldu (liste yenilenince gorunur)": {
+  "en": "pair created (appears when the list refreshes)",
+  "tr": "çift oluşturuldu (liste yenilenince görünür)"
+ },
+ "cihazin IP'si, ornek 192.168.10.50": {
+  "en": "device IP, e.g. 192.168.10.50",
+  "tr": "cihazın IP'si, örnek 192.168.10.50"
+ },
+ "com0com indiriliyor...": {
+  "en": "Downloading com0com...",
+  "tr": "com0com indiriliyor..."
+ },
+ "com0com indiriliyor/kuruluyor...": {
+  "en": "Downloading/installing com0com...",
+  "tr": "com0com indiriliyor/kuruluyor..."
+ },
+ "com0com kuruldu": {
+  "en": "com0com installed",
+  "tr": "com0com kuruldu"
+ },
+ "com0com kurulu degil": {
+  "en": "com0com not installed",
+  "tr": "com0com kurulu değil"
+ },
+ "com0com kurulu ✓ (yeniden kur)": {
+  "en": "com0com installed ✓ (reinstall)",
+  "tr": "com0com kurulu ✓ (yeniden kur)"
+ },
+ "desteklenmiyor": {
+  "en": "not supported",
+  "tr": "desteklenmiyor"
+ },
+ "dosya cok buyuk (>64 MB)": {
+  "en": "file too large (>64 MB)",
+  "tr": "dosya çok büyük (>64 MB)"
+ },
+ "durduruldu": {
+  "en": "stopped",
+  "tr": "durduruldu"
+ },
+ "durum ": {
+  "en": "status ",
+  "tr": "durum "
+ },
+ "gecersiz komut": {
+  "en": "invalid command",
+  "tr": "geçersiz komut"
+ },
+ "genel hata": {
+  "en": "general failure",
+  "tr": "genel hata"
+ },
+ "hata ": {
+  "en": "error ",
+  "tr": "hata "
+ },
+ "hedef IP (bos = sadece dinle)": {
+  "en": "target IP (empty = listen only)",
+  "tr": "hedef IP (boş = sadece dinle)"
+ },
+ "hedef erisilemez": {
+  "en": "destination unreachable",
+  "tr": "hedef erişilemez"
+ },
+ "henuz cevap vermiyor; farkli alt agda oldugu icin normal": {
+  "en": "not answering yet; normal since it is on a different subnet",
+  "tr": "henüz cevap vermiyor; farklı alt ağda olduğu için normal"
+ },
+ "iPerf hedefi yap": {
+  "en": "Set as iPerf target",
+  "tr": "iPerf hedefi yap"
+ },
+ "ifconfig: gecersiz": {
+  "en": "ifconfig: invalid",
+  "tr": "ifconfig: geçersiz"
+ },
+ "ikinci gercek port (B)": {
+  "en": "second real port (B)",
+  "tr": "ikinci gerçek port (B)"
+ },
+ "ip: sadece addr/route/link": {
+  "en": "ip: only addr/route/link",
+  "tr": "ip: sadece addr/route/link"
+ },
+ "iperf3 sunucusu dinliyor: ": {
+  "en": "iperf3 server listening: ",
+  "tr": "iperf3 sunucusu dinliyor: "
+ },
+ "iptal edildi": {
+  "en": "cancelled",
+  "tr": "iptal edildi"
+ },
+ "istemci kapatti": {
+  "en": "client closed",
+  "tr": "istemci kapattı"
+ },
+ "izin verilmeyen komut: ": {
+  "en": "command not allowed: ",
+  "tr": "izin verilmeyen komut: "
+ },
+ "karsi cihazin IP'si (orada: iperf3 -s)": {
+  "en": "remote device IP (run there: iperf3 -s)",
+  "tr": "karşı cihazın IP'si (orada: iperf3 -s)"
+ },
+ "kayip": {
+  "en": "lost",
+  "tr": "kayıp"
+ },
+ "macOS: ek IP gecicidir (yeniden baslatinca gider).": {
+  "en": "macOS: the extra IP is temporary (lost on reboot).",
+  "tr": "macOS: ek IP geçicidir (yeniden başlatınca gider)."
+ },
+ "nmcli: sadece connection/device": {
+  "en": "nmcli: only connection/device",
+  "tr": "nmcli: sadece connection/device"
+ },
+ "ornek 8.8.8.8 (bos olabilir)": {
+  "en": "e.g. 8.8.8.8 (optional)",
+  "tr": "örnek 8.8.8.8 (boş olabilir)"
+ },
+ "ornek: COM11 (com0com ciftinin BIR ucu)": {
+  "en": "e.g. COM11 (ONE end of the com0com pair)",
+  "tr": "örnek: COM11 (com0com çiftinin BİR ucu)"
+ },
+ "ping desteklenmiyor": {
+  "en": "ping not supported",
+  "tr": "ping desteklenmiyor"
+ },
+ "ping yok (ARP'de var)": {
+  "en": "no ping (present in ARP)",
+  "tr": "ping yok (ARP'de var)"
+ },
+ "pkexec yok": {
+  "en": "pkexec not found",
+  "tr": "pkexec yok"
+ },
+ "setup.exe bulunamadi": {
+  "en": "setup.exe not found",
+  "tr": "setup.exe bulunamadı"
+ },
+ "sinirsiz": {
+  "en": "unlimited",
+  "tr": "sınırsız"
+ },
+ "sira": {
+  "en": "seq",
+  "tr": "sıra"
+ },
+ "sn": {
+  "en": "s",
+  "tr": "sn"
+ },
+ "strace bulunamadi. Kurun:  sudo apt install strace": {
+  "en": "strace not found. Install it:  sudo apt install strace",
+  "tr": "strace bulunamadı. Kurun:  sudo apt install strace"
+ },
+ "su an pinge CEVAP VERIYOR": {
+  "en": "is answering ping NOW",
+  "tr": "şu an pinge CEVAP VERİYOR"
+ },
+ "sunucu :": {
+  "en": "server :",
+  "tr": "sunucu :"
+ },
+ "sunucu ALIR": {
+  "en": "server RECEIVES",
+  "tr": "sunucu ALIR"
+ },
+ "sunucu GONDERIR (-R)": {
+  "en": "server SENDS (-R)",
+  "tr": "sunucu GÖNDERİR (-R)"
+ },
+ "sure": {
+  "en": "time",
+  "tr": "süre"
+ },
+ "surekli": {
+  "en": "continuous",
+  "tr": "sürekli"
+ },
+ "usermod sadece dialout/uucp grubuna ekleme icin": {
+  "en": "usermod is only allowed for adding to the dialout/uucp group",
+  "tr": "usermod sadece dialout/uucp grubuna ekleme için"
+ },
+ "veri akisi baglanmadi (zaman asimi)": {
+  "en": "data stream did not connect (timeout)",
+  "tr": "veri akışı bağlanmadı (zaman aşımı)"
+ },
+ "yardimci baglantisi koptu: ": {
+  "en": "helper connection lost: ",
+  "tr": "yardımcı bağlantısı koptu: "
+ },
+ "yardimci baslamadi": {
+  "en": "helper did not start",
+  "tr": "yardımcı başlamadı"
+ },
+ "yardimci yanit vermedi": {
+  "en": "helper did not respond",
+  "tr": "yardımcı yanıt vermedi"
+ },
+ "yetki verilmedi": {
+  "en": "permission not granted",
+  "tr": "yetki verilmedi"
+ },
+ "yonetici izni alinamadi (": {
+  "en": "could not obtain admin rights (",
+  "tr": "yönetici izni alınamadı ("
+ },
+ "zaman asimi": {
+  "en": "timeout",
+  "tr": "zaman aşımı"
+ },
+ "zip icinde .app yok": {
+  "en": "no .app inside the zip",
+  "tr": "zip içinde .app yok"
+ },
+ "{t}: seçili pencerenin içeriğini buna çevir": {
+  "en": "{t}: switch the selected pane to this",
+  "tr": "{t}: seçili pencerenin içeriğini buna çevir"
+ },
+ "── SONUC (": {
+  "en": "── RESULT (",
+  "tr": "── SONUÇ ("
+ },
+ "■ Kaydi durdur": {
+  "en": "■ Stop recording",
+  "tr": "■ Kaydı durdur"
+ },
+ "▲ Üste": {
+  "en": "▲ Up",
+  "tr": "▲ Üste"
+ },
+ "▼ Alta": {
+  "en": "▼ Down",
+  "tr": "▼ Alta"
+ },
+ "◀ Sola": {
+  "en": "◀ Left",
+  "tr": "◀ Sola"
+ },
+ "○ kablo yok": {
+  "en": "○ no cable",
+  "tr": "○ kablo yok"
+ },
+ "● Kayit": {
+  "en": "● Record",
+  "tr": "● Kayıt"
+ },
+ "● bagli": {
+  "en": "● connected",
+  "tr": "● bağlı"
+ },
+ "● cevap veriyor": {
+  "en": "● responding",
+  "tr": "● cevap veriyor"
+ },
+ "⟳ Yenile": {
+  "en": "⟳ Refresh",
+  "tr": "⟳ Yenile"
+ },
+ "🔑 Yonetici izni isteniyor...  ": {
+  "en": "🔑 Requesting admin rights...  ",
+  "tr": "🔑 Yönetici izni isteniyor...  "
+ }
+}

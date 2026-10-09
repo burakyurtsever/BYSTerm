@@ -1,9 +1,9 @@
 name: Build & Release
 
 # Yeni sürüm iki yoldan çıkar:
-#  1) GitHub > Actions > "Build & Release" > Run workflow > sürüm (ör. 1.0.1) yaz > Run
+#  1) GitHub > Actions > "Build & Release" > Run workflow > sürüm (ör. 0.3.1) yaz > Run
 #     (etiketi workflow kendisi oluşturur)
-#  2) git tag v1.0.1 && git push origin v1.0.1
+#  2) git tag v0.3.1 && git push origin v0.3.1
 # Tüm platformlar derlenir, her biri kendi selftest'inden geçer, sonra Releases'a yüklenir.
 # Sürüm boş bırakılırsa sadece derlenir/test edilir (Release oluşmaz).
 on:
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Sürüm (ör. 1.0.1). Boş = sadece derle/test et'
+        description: 'Sürüm (ör. 0.3.1). Boş = sadece derle/test et'
         required: false
         default: ''
 

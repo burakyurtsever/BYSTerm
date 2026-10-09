@@ -18,10 +18,42 @@ def set_lang(code):
     LANG = code if code in dict(LANGS) else 'en'
 
 
-def tr(s):
-    if LANG == 'tr':
-        return TR.get(s, s)
+try:
+    from bysterm_i18n_data import FULL, FRAGS     # uretilmis sozluk: {kaynak: (en, tr)}
+except ImportError:      # pragma: no cover
+    FULL, FRAGS = {}, []
+
+
+def tx(s):
+    """Arayuz metnini secili dile cevir. Tam eslesme, yoksa bicimli metin parcalari (f-string)."""
+    if not isinstance(s, str) or not s:
+        return s
+    i = 1 if LANG == 'tr' else 0
+    hit = FULL.get(s)
+    if hit is not None:
+        return hit[i]
+    if LANG == 'tr' and s in TR:          # Ingilizce kaynakli eski tr() metinleri
+        return TR[s]
+    for src, en, trk in FRAGS:            # uzundan kisaya
+        if src in s:
+            s = s.replace(src, trk if i else en)
     return s
+
+
+def tx_exact(s):
+    """Sadece birebir bilinen metni cevir (kullanici verisi olabilecek yerler icin; parca degistirme yok)."""
+    if not isinstance(s, str) or not s:
+        return s
+    hit = FULL.get(s)
+    if hit is not None:
+        return hit[1 if LANG == 'tr' else 0]
+    if LANG == 'tr' and s in TR:
+        return TR[s]
+    return s
+
+
+def tr(s):
+    return tx(s)
 
 
 TR = {
@@ -47,7 +79,11 @@ TR = {
     'Developer': 'Geliştirici',
     'Source code & releases': 'Kaynak kod ve sürümler',
     'Close': 'Kapat',
-    'about_text': (
+    ('BYSTerm is a fast test and monitoring tool for embedded and network developers. '
+     'It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, '
+     'IP scanning and iperf3 speed tests together in one window with side-by-side panes. '
+     'It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson '
+     'without any installation.'): (
         'BYSTerm, gömülü sistem ve ağ geliştiricileri için hızlı bir test ve izleme aracıdır. '
         'Seri port, TCP, UDP, seri trafik izleme, ağ ayarları, ping, IP tarama ve iperf3 hız testini '
         'tek pencerede, yan yana bölmelerde toplar. Yüksek veri hızında donmaz; Windows, macOS, Linux '
