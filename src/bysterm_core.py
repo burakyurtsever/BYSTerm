@@ -1172,3 +1172,168 @@ class SerialBridge(Transport):
         if self.pty:
             self.pty.close()
 
+
+
+# =========================================================================== Linux: calisan surecin seri portunu dinleme
+IS_LINUX = sys.platform.startswith('linux')
+
+
+def which(name):
+    for d in os.environ.get('PATH', '').split(os.pathsep) + ['/usr/sbin', '/sbin', '/usr/bin', '/bin']:
+        fp = os.path.join(d, name)
+        if os.path.isfile(fp) and os.access(fp, os.X_OK):
+            return fp
+    return None
+
+# Eltima tarzi "gercek portu dinleme" Linux/Jetson karsiligi: portu BASKA bir uygulama acsa bile,
+# o surecin seri port uzerindeki read()/write() cagrilarini strace (ptrace) ile izleyip gosteririz.
+# Sanal port GEREKMEZ, izlenen uygulama degismez. (Windows'ta ayni sey imzali cekirdek surucusu ister.)
+_SERIAL_DEV_RE = __import__('re').compile(r'/dev/(tty(USB|ACM|S|AMA|THS|TCU|mxc|SAC|O)|cu\.|tty\.)')
+
+
+def list_serial_openers():
+    """Seri port acmis surecleri bul -> [{'pid','name','cmd','devices':[...]}]. Linux (/proc)."""
+    out = []
+    if not IS_LINUX or not os.path.isdir('/proc'):
+        return out
+    me = os.getpid()
+    for pid in os.listdir('/proc'):
+        if not pid.isdigit() or int(pid) == me:
+            continue
+        fddir = f'/proc/{pid}/fd'
+        devs = []
+        try:
+            for fd in os.listdir(fddir):
+                try:
+                    tgt = os.readlink(os.path.join(fddir, fd))
+                except OSError:
+                    continue
+                if _SERIAL_DEV_RE.match(tgt) and tgt not in devs:
+                    devs.append(tgt)
+        except (OSError, PermissionError):
+            continue
+        if not devs:
+            continue
+        try:
+            with open(f'/proc/{pid}/cmdline', 'rb') as f:
+                cmd = f.read().replace(b'\0', b' ').decode('utf-8', 'replace').strip()
+            with open(f'/proc/{pid}/comm') as f:
+                name = f.read().strip()
+        except OSError:
+            cmd, name = '', pid
+        out.append({'pid': int(pid), 'name': name, 'cmd': cmd or name, 'devices': devs})
+    return out
+
+
+def _target_fds(pid, device):
+    fds = []
+    try:
+        for fd in os.listdir(f'/proc/{pid}/fd'):
+            try:
+                if os.path.realpath(os.readlink(f'/proc/{pid}/fd/{fd}')) == os.path.realpath(device):
+                    fds.append(int(fd))
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return fds
+
+
+class SerialSniffer(Transport):
+    """Calisan bir surecin (pid) bir seri port (device) uzerindeki trafigini dinler (Linux, strace).
+
+    read()  -> cihazdan geldi   (RX, 'CIHAZ>')
+    write() -> uygulama gonderdi (TX, 'UYGUL>')
+    Pasiftir: hicbir sey yazilmaz/degistirilmez. ptrace yetkisi gerekebilir (ayni kullanici + yama=0,
+    yoksa root): privileged yardimci veya sudo ile.
+    """
+    kind = 'sniff'
+    labels = {RX: 'CIHAZ>', TX: 'UYGUL>'}
+
+    _LINE = __import__('re').compile(
+        r'^(?:\[pid\s+(\d+)\]\s*)?(read|write)\((\d+),\s*"((?:\\x[0-9a-fA-F]{2})*)"(?:\.\.\.)?,\s*\d+\)\s*=\s*(-?\d+)')
+
+    def __init__(self, pid, device, use_helper=False):
+        super().__init__()
+        self.pid = int(pid)
+        self.device = device
+        self.use_helper = use_helper
+        self.proc = None
+        self.description = f'pid {pid} · {device}'
+
+    def _strace_cmd(self):
+        return ['strace', '-p', str(self.pid), '-f', '-e', 'trace=read,write',
+                '-s', '65536', '-xx', '-qqq']
+
+    def _open_and_run(self):
+        if not IS_LINUX:
+            raise RuntimeError('Canli dinleme yalnizca Linux/Jetson icin')
+        if not which('strace'):
+            raise RuntimeError("strace bulunamadi. Kurun:  sudo apt install strace")
+        if not os.path.exists(f'/proc/{self.pid}'):
+            raise RuntimeError(f'Surec kapanmis (pid {self.pid})')
+        fds = set(_target_fds(self.pid, self.device))
+        if not fds:
+            raise RuntimeError(f'pid {self.pid} bu portu artik acmiyor: {self.device}')
+        import subprocess as sp
+        cmd = self._strace_cmd()
+        if self.use_helper or (os.geteuid() != 0 and not self._ptrace_ok()):
+            pk = which('pkexec')
+            if pk:
+                cmd = [pk] + cmd
+        self.proc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT, bufsize=1, universal_newlines=True)
+        self._state('open', f'Dinleme basladi: pid {self.pid} ({self.device}). '
+                            f'Izlenen uygulama hic degismez; sanal port yok. (Pasif dinleme)')
+        while not self._stop.is_set():
+            line = self.proc.stdout.readline()
+            if not line:
+                break
+            m = self._LINE.match(line.strip())
+            if not m:
+                if 'ptrace' in line and ('Operation not permitted' in line or 'Could not attach' in line):
+                    self._fail('Yetki yok (ptrace). BYSTerm\'i sudo ile acin ya da yonetici izni verin.')
+                    return
+                continue
+            call, fd, hexs, ret = m.group(2), int(m.group(3)), m.group(4), int(m.group(5))
+            if fd not in fds or ret <= 0 or not hexs:
+                continue
+            try:
+                data = bytes(int(hexs[i + 2:i + 4], 16) for i in range(0, len(hexs), 4))[:ret]
+            except ValueError:
+                continue
+            if data:
+                self._data(RX if call == 'read' else TX, data)
+        if not self._stop.is_set():
+            self._fail(f'Izleme bitti (surec kapandi, pid {self.pid})')
+
+    def _ptrace_ok(self):
+        try:
+            with open('/proc/sys/kernel/yama/ptrace_scope') as f:
+                scope = int(f.read().strip())
+        except OSError:
+            scope = 0
+        # yama=0: ayni kullanicinin sureci izlenebilir. Surec bizimle ayni uid mi?
+        if scope == 0:
+            try:
+                st = os.stat(f'/proc/{self.pid}')
+                return st.st_uid == os.geteuid()
+            except OSError:
+                return False
+        return False
+
+    def send(self, data, target=None):
+        self._info('Dinleme modunda gonderme yok (pasif)', 'warn')
+
+    def _release(self):
+        if self.proc is not None:
+            try:
+                self.proc.terminate()
+            except Exception:
+                pass
+            try:
+                self.proc.wait(timeout=1)
+            except Exception:
+                try:
+                    self.proc.kill()
+                except Exception:
+                    pass

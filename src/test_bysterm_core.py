@@ -176,6 +176,66 @@ class NetTools(unittest.TestCase):
         self._iperf(udp=True, rate=20000000)
 
 
+    def test_sniffer_parse(self):
+        bs = chr(92)        # tek ters bolu (strace -xx ciktisindaki gibi)
+        line = 'read(3, "%sx41%sx42%sx0a", 32) = 3' % (bs, bs, bs)
+        m = c.SerialSniffer._LINE.match(line)
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(2), 'read')
+        self.assertEqual(int(m.group(3)), 3)
+        self.assertEqual(int(m.group(5)), 3)
+        hexs = m.group(4)
+        data = bytes(int(hexs[i + 2:i + 4], 16) for i in range(0, len(hexs), 4))
+        self.assertEqual(data, b'AB' + bytes([10]))
+        self.assertIsNotNone(c.SerialSniffer._LINE.match('[pid 42] write(5, "%sxff", 1) = 1' % bs))
+
+    @unittest.skipUnless(c.IS_LINUX, 'Linux')
+    def test_sniffer_live(self):
+        import tty as _tty
+        import re as _re
+        import subprocess as _sp
+        if not c.which('strace'):
+            self.skipTest('strace yok')
+        mas, slv = os.openpty()
+        _tty.setraw(slv)
+        dev = os.ttyname(slv)
+        # izlenecek AYRI surec: pty'yi acip surekli okur
+        code = ('import os,sys;'
+                'fd=os.open(sys.argv[1], os.O_RDWR);'
+                "open('/proc/self/comm','w').write('faketgt');"
+                'import time\n'
+                'while True:\n os.read(fd, 64)')
+        app = _sp.Popen(['python3', '-c', code, dev])
+        orig = c._SERIAL_DEV_RE
+        c._SERIAL_DEV_RE = _re.compile(r'/dev/(pts/|tty(USB|ACM|S|THS))')
+        try:
+            self.assertTrue(wait(lambda: any(o['pid'] == app.pid for o in c.list_serial_openers()), 5))
+            sn = c.SerialSniffer(app.pid, os.path.realpath(dev))
+            sn.start()
+            if not wait(lambda: has(sn, 'state', 'open') or has(sn, 'closed'), 6):
+                sn.close()
+                self.skipTest('strace baglanamadi (ptrace yetkisi?)')
+            if has(sn, 'closed'):
+                sn.close()
+                self.skipTest('ptrace izni yok')
+            for _ in range(5):
+                os.write(mas, b'HELLO\n')
+                time.sleep(0.2)
+            ok = wait(lambda: any(e[0] == 'data' and e[2] == c.RX and b'HELLO' in e[3]
+                                  for e in list(sn.events)), 4)
+            sn.close()
+            self.assertTrue(ok, 'cihaz->uygulama trafigi yakalanamadi')
+        finally:
+            c._SERIAL_DEV_RE = orig
+            app.terminate()
+            app.wait()
+            os.close(mas)
+            try:
+                os.close(slv)
+            except OSError:
+                pass
+
+
 if __name__ == '__main__':
     socket.setdefaulttimeout(5)
     unittest.main(verbosity=1)

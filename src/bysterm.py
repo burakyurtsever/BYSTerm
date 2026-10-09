@@ -1402,12 +1402,45 @@ class MonitorSession(Session):
     HAS_SEND = False
 
     def build_connection(self, row, col):
+        # --- mod secimi
+        mrow = FlowLayout()
+        self.mode_sel = W.QComboBox()
+        self.mode_sel.addItem('Canli dinleme (calisan uygulamayi izle)', 'live')
+        self.mode_sel.addItem('Sanal port koprusu', 'bridge')
+        self.mode_sel.addItem('Pasif donanim tap (2 port)', 'tap')
+        if not core.IS_LINUX:
+            self.mode_sel.model().item(0).setEnabled(False)   # canli dinleme: yalniz Linux/Jetson
+            self.mode_sel.setCurrentIndex(1)
+        self.mode_sel.currentIndexChanged.connect(self._mode_changed)
+        mrow.addWidget(W.QLabel('Yontem'))
+        mrow.addWidget(self.mode_sel, 1)
+        self.btn_rescan = W.QToolButton()
+        self.btn_rescan.setText('⟳')
+        self.btn_rescan.setToolTip('Seri port acmis uygulamalari yeniden tara')
+        self.btn_rescan.clicked.connect(lambda: self._fill_procs())
+        mrow.addWidget(self.btn_rescan)
+        col.addLayout(mrow)
+
+        # --- canli dinleme: surec listesi
+        self.live_row = W.QWidget()
+        lr = FlowLayout(self.live_row)
+        self.proc = W.QComboBox()
+        self.proc.setMinimumWidth(320)
+        lr.addWidget(W.QLabel('Uygulama'))
+        lr.addWidget(self.proc, 1)
+        col.addWidget(self.live_row)
+
+        # --- kopru / tap: gercek port + ayar
         self.ss = SerialSettings(self.main)
         self.ss.port.lineEdit().setPlaceholderText('Cihazin bagli oldugu GERCEK port')
-        row.addWidget(W.QLabel('Gercek'))
-        row.addWidget(self.ss, 1)
+        self.port_row = W.QWidget()
+        pr = FlowLayout(self.port_row)
+        pr.addWidget(W.QLabel('Gercek'))
+        pr.addWidget(self.ss, 1)
+        col.addWidget(self.port_row)
 
-        r2 = FlowLayout()
+        self.virt_row = W.QWidget()
+        r2 = FlowLayout(self.virt_row)
         self.virt = W.QComboBox()
         self.virt.setEditable(True)
         self.virt.setMinimumWidth(200)
@@ -1415,17 +1448,13 @@ class MonitorSession(Session):
         self.chk_follow.setChecked(True)
         self.chk_follow.setToolTip('Diger uygulama sanal portu hangi baud ile acarsa gercek port '
                                    'de o baud\'a gecer (Linux/macOS)')
-        self.chk_passive = W.QCheckBox('Pasif dinleme (2 gercek port, iletim yok)')
-        self.chk_passive.setToolTip(
-            'Donanim "tap" modu: iki USB-seri ceviricinin RX ucu izlenen hattin TX ve RX\'ine\n'
-            'baglanir; BYSTerm ikisini de sadece dinler ve tek zaman cizelgesinde gosterir.')
-        self.chk_passive.toggled.connect(self._passive_toggled)
         self.lbl_v = W.QLabel('Sanal port')
         r2.addWidget(self.lbl_v)
         r2.addWidget(self.virt, 1)
         r2.addWidget(self.chk_follow)
-        r2.addWidget(self.chk_passive)
-        col.addLayout(r2)
+        col.addWidget(self.virt_row)
+        self.chk_passive = W.QCheckBox()      # geriye uyum (make_transport kullanir)
+        self.chk_passive.setVisible(False)
 
         self.help = W.QLabel()
         self.help.setWordWrap(True)
@@ -1433,7 +1462,56 @@ class MonitorSession(Session):
         col.addWidget(self.help)
         self.chk_follow.setVisible(core.IS_POSIX)
         self._fill_virt(self.main.ports)
-        self._passive_toggled(False)
+        self._fill_procs()
+        self._mode_changed()
+
+    def cur_mode(self):
+        return self.mode_sel.currentData()
+
+    def _mode_changed(self, *_):
+        mode = self.cur_mode()
+        self.chk_passive.setChecked(mode == 'tap')
+        self.live_row.setVisible(mode == 'live')
+        self.port_row.setVisible(mode != 'live')
+        self.virt_row.setVisible(mode == 'bridge')
+        if mode == 'live':
+            self._fill_procs()
+            self.help.setText(
+                'CANLI DINLEME (Linux/Jetson): Portu BASKA bir uygulama acsa bile (orn. minicom, kendi '
+                'programiniz), o uygulamanin seri trafigini SANAL PORT OLMADAN burada gorursunuz; izlenen '
+                'uygulama hic degismez, veriye dokunulmaz (pasif). Listeden uygulamayi secip baslatin. '
+                'Yetki gerekirse yonetici izni istenir.')
+        elif mode == 'tap':
+            self.lbl_v.setText('Ikinci port (B)')
+            self.help.setText(
+                'PASIF DONANIM TAP: Iki USB-seri cevirici; A = ustteki port, B = asagidaki ikinci port, '
+                'RX uclari izlenen hattin TX ve RX\'ine baglanir. BYSTerm ikisini de sadece dinler. '
+                'GND\'leri ortak baglayin.')
+            self.virt_row.setVisible(True)
+            self.lbl_v.setText('Ikinci port (B)')
+            self.chk_follow.setVisible(False)
+            self.virt.lineEdit().setPlaceholderText('ikinci gercek port (B)')
+        else:
+            self.lbl_v.setText('Sanal port')
+            self.chk_follow.setVisible(core.IS_POSIX)
+            self._passive_toggled(False)
+
+    def _fill_procs(self):
+        if not core.IS_LINUX or self.proc.view().isVisible():
+            return
+        cur = self.proc.currentData()
+        self.proc.blockSignals(True)
+        self.proc.clear()
+        openers = core.list_serial_openers()
+        for o in openers:
+            for dev in o['devices']:
+                short = o['cmd'] if len(o['cmd']) < 60 else o['cmd'][:57] + '...'
+                self.proc.addItem(f'{dev}  ←  {o["name"]} (pid {o["pid"]})  {short}', (o['pid'], dev))
+        if self.proc.count() == 0:
+            self.proc.addItem('(seri port acmis uygulama bulunamadi — once o uygulamada portu acin)', None)
+        idx = self.proc.findData(cur) if cur else -1
+        self.proc.setCurrentIndex(max(0, idx))
+        self.proc.blockSignals(False)
 
     def _fill_virt(self, ports):
         if self.virt.view().isVisible():
@@ -1474,7 +1552,7 @@ class MonitorSession(Session):
                 'izlediginiz uygulamada ciftin OBUR ucunu (COM12) acin. Trafik iki yonde iletilir ve gorunur.')
 
     def labels(self):
-        if self.chk_passive.isChecked():
+        if self.cur_mode() == 'tap':
             return {RX: 'A>', TX: 'B>'}
         return {RX: 'CIHAZ>', TX: 'UYGUL>'}
 
@@ -1485,6 +1563,12 @@ class MonitorSession(Session):
         return 'Durdur'
 
     def make_transport(self):
+        if self.cur_mode() == 'live':
+            d = self.proc.currentData()
+            if not d:
+                raise ValueError('Izlenecek uygulamayi secin (seri port acmis bir surec)')
+            pid, dev = d
+            return core.SerialSniffer(pid, dev)
         cfg = self.ss.config()
         i = self.virt.currentIndex()
         txt = self.virt.currentText().strip()
@@ -1498,18 +1582,21 @@ class MonitorSession(Session):
                                  passive=self.chk_passive.isChecked())
 
     def set_inputs_enabled(self, en):
-        for w in (self.ss, self.virt, self.chk_follow, self.chk_passive):
+        for w in (self.ss, self.virt, self.chk_follow, self.mode_sel, self.proc, self.btn_rescan):
             w.setEnabled(en)
-        if en:
-            self.chk_follow.setEnabled(not self.chk_passive.isChecked())
 
     def tab_label(self):
+        if self.cur_mode() == 'live':
+            d = self.proc.currentData()
+            return 'Dinle ' + (os.path.basename(d[1]) if d else '')
         return 'Izleme ' + os.path.basename(self.ss.current_device() or '')
 
     def update_ports(self, ports):
         if not self.transport:
             self.ss.update_ports(ports)
             self._fill_virt(ports)
+            if self.cur_mode() == 'live':
+                self._fill_procs()
 
     def save_settings(self, st):
         self.ss.save(st, self.KIND)
