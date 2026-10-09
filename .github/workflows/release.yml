@@ -63,6 +63,32 @@ jobs:
           $p = Start-Process -FilePath release\BYSTerm-windows-x64.exe -ArgumentList '--selftest' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "selftest failed: $($p.ExitCode)" }
           "selftest OK"
+      - name: Fetch com0com (signed virtual serial driver, best effort)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $ver = if ('${{ github.ref_name }}' -match 'v(.+)') { $matches[1] } elseif ('${{ inputs.version }}') { '${{ inputs.version }}' } else { '0.0.0' }
+          "BYSTERM_VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          New-Item -ItemType Directory -Force installer\com0com | Out-Null
+          # imzali com0com (3.0.0.0, i386+x64). SourceForge indirmesi basarisizsa installer com0com'suz uretilir.
+          $url = 'https://downloads.sourceforge.net/project/com0com/com0com/3.0.0.0/com0com-3.0.0.0-i386-and-x64-signed.zip'
+          try {
+            Invoke-WebRequest -Uri $url -OutFile com0com.zip -UseBasicParsing -TimeoutSec 120
+            Expand-Archive com0com.zip -DestinationPath installer\com0com -Force
+            "WITH_COM0COM=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } catch { Write-Host "com0com indiriledi: $_" }
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $ver = if ($env:BYSTERM_VERSION) { $env:BYSTERM_VERSION } else { '0.0.0' }
+          $args = @("/DAppVersion=$ver")
+          if ($env:WITH_COM0COM -eq '1') { $args += '/DWithCom0com=1' }
+          $args += 'installer\bysterm.iss'
+          & $iscc @args
+          Copy-Item installer\Output\BYSTerm-Setup-windows-x64.exe release\ -Force
+          Get-ChildItem release
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
@@ -114,10 +140,12 @@ jobs:
             ## İndir
             | Sistem | Dosya |
             |---|---|
-            | Windows 10/11 (64-bit) | `BYSTerm-windows-x64.exe` — çift tıkla |
+            | Windows 10/11 — **kurulum (önerilen)** | `BYSTerm-Setup-windows-x64.exe` — çift tıkla, kur |
+            | Windows 10/11 — taşınabilir (kurulumsuz) | `BYSTerm-windows-x64.exe` |
             | macOS Apple Silicon (M1–M4) | `BYSTerm-macos-arm64.zip` |
             | macOS Intel | `BYSTerm-macos-x64.zip` |
             | Linux PC (Ubuntu 18.04+) | `BYSTerm-linux-x64.tar.gz` |
             | NVIDIA Jetson (JetPack 4 / 5 / 6), Raspberry Pi 64-bit | `BYSTerm-linux-arm64.tar.gz` |
 
-            Kurulum gerekmez. Ayrıntılar: README.
+            Windows kurulumu, seri port izleme için sanal port sürücüsünü (com0com) de isteğe bağlı kurar.
+            Taşınabilir sürüm ve Linux/Mac paketleri kurulum gerektirmez. Ayrıntılar: README.

@@ -31,7 +31,8 @@ Python, pip ya da başka bir kütüphane **gerekmez**; her şey dosyanın içind
 
 | Sistem | Dosya | Nasıl açılır |
 |---|---|---|
-| **Windows** 10 / 11 (64-bit) | `BYSTerm-windows-x64.exe` | Çift tıklayın. İlk açılışta "Windows bilgisayarınızı korudu" çıkarsa: *Ek bilgi → Yine de çalıştır* (uygulama imzasız olduğu için). |
+| **Windows** 10 / 11 — kurulum (önerilen) | `BYSTerm-Setup-windows-x64.exe` | Çift tıklayıp kurun. Başlat menüsüne eklenir; seri izleme için sanal port sürücüsünü (com0com) de isteğe bağlı kurar. İlk açılışta "Windows bilgisayarınızı korudu" çıkarsa *Ek bilgi → Yine de çalıştır* (imzasız). |
+| **Windows** 10 / 11 — taşınabilir | `BYSTerm-windows-x64.exe` | Kurulumsuz tek dosya. Çift tıklayın. |
 | **macOS** Apple Silicon (M1–M4) | `BYSTerm-macos-arm64.zip` | Zip'i açın, `BYSTerm.app`'i Uygulamalar'a sürükleyin. İlk açılışta *sağ tık → Aç* (imzasız). Olmazsa Terminal'de: `xattr -dr com.apple.quarantine /Applications/BYSTerm.app` |
 | **macOS** Intel | `BYSTerm-macos-x64.zip` | Aynı şekilde |
 | **Linux PC** (Ubuntu 18.04 → 24.04+, Debian, Mint…) | `BYSTerm-linux-x64.tar.gz` | `tar xzf BYSTerm-linux-x64.tar.gz && cd BYSTerm && ./BYSTerm`. Menüye eklemek için: `./install.sh` |
@@ -91,35 +92,27 @@ Gerçek bir UART 3 Mbaud'da bile ~0.3 MB/s'dir, yani bu sınırın çok altında
 
 ## Seri İzleme (başka uygulamanın trafiğini görmek)
 
-Linux, macOS ve Windows'ta bir port aynı anda tek uygulama tarafından açılabilir. Bu yüzden
-izleme, araya girerek yapılır:
+Üç yöntem var; **Seri İzleme** penceresinin üstündeki "Yöntem" listesinden seçilir.
 
-```
-[Cihaz] ── GERÇEK PORT ── BYSTerm ── SANAL PORT ── [İzlenen uygulama]
-                            (iki yönü de gösterir + aynen iletir)
-```
+**1) Canlı dinleme — Linux / Jetson (sanal port yok, önerilen):**
+Portu BAŞKA bir uygulama açmış olsa bile (minicom, kendi programın, ROS düğümü…) onun seri
+trafiğini olduğu gibi görürsün. İzlenen uygulama hiç değişmez, veriye dokunulmaz (tamamen pasif).
+Listeden seri port açmış uygulamayı seç, başlat. `CIHAZ>` = cihazdan gelen, `UYGUL>` = uygulamanın
+gönderdiği. Çekirdeğin `ptrace` yetkisi gerekir; gerekirse yönetici izni istenir (`sudo apt install strace`).
 
-**Linux / macOS (ek kurulum gerekmez):**
-1. *Seri İzleme* sekmesinde **Gerçek** port = cihazın bağlı olduğu port (ör. `/dev/ttyUSB0`).
-2. **Sanal port** = `/tmp/ttyV0` (varsayılan; istediğiniz yolu yazabilirsiniz).
-3. *İzlemeyi başlat* → izlemek istediğiniz uygulamada `/dev/ttyUSB0` yerine **`/tmp/ttyV0`** açın.
-4. `CIHAZ>` satırları cihazdan, `UYGUL>` satırları uygulamadan gelen veridir.
-   *"Uygulamanın baud/format ayarını takip et"* açıksa, uygulama sanal portu hangi baud ile
-   açarsa gerçek port da o baud'a geçer.
+**2) Sanal port köprüsü (tüm sistemler):**
+BYSTerm gerçek portu açar ve bir sanal port oluşturur; izlemek istediğin uygulamada gerçek port
+yerine bu sanal portu açarsın. Linux/macOS'ta sanal port otomatik (`/tmp/ttyV0`). **Windows'ta**
+bir sanal null-modem çifti gerekir — kurulum (installer) bunu **com0com** ile otomatik kurar:
+izlenen uygulamada çiftin bir ucunu (ör. CNCB0), BYSTerm'de diğer ucunu açarsın.
 
-> Not: Bazı uygulamalar sadece `/dev/tty*` listesini gösterir. Yolu elle yazın ya da sanal
-> portu `/dev` altında oluşturmak için BYSTerm'u `sudo` ile çalıştırıp yol olarak
-> `/dev/ttyV0` girin.
+**3) Pasif donanım tap:**
+İki USB-seri çeviricinin RX uçlarını hattın TX ve RX'ine bağlarsın; BYSTerm ikisini de sadece
+dinler (`A>` / `B>`). İzlenen cihazlara hiç dokunmaz.
 
-**Windows:** Sanal port sürücüsü olmadan bu yapılamaz. Ücretsiz **com0com** ile bir sanal
-null-modem çifti kurun (ör. `COM11 <-> COM12`; Eltima VSPD varsa o da olur):
-1. Gerçek port = cihaz (ör. `COM3`), Sanal port = `COM11`.
-2. İzlenen uygulamada `COM12`'yi açın.
-
-**Pasif dinleme (donanım tap):** İki USB-seri dönüştürücünün **RX** uçlarını izlenen hattın
-TX ve RX'ine (ve GND'yi ortak) bağlayın, *"Pasif dinleme"*yi işaretleyin, iki portu seçin.
-BYSTerm ikisini de yalnızca dinler (`A>` / `B>`) ve tek zaman çizelgesinde gösterir. Bu mod
-hattaki cihazlara hiç dokunmaz.
+> Not: Windows'ta "gerçek portu, sanal port olmadan dinleme" (Eltima'nın yaptığı) imzalı bir
+> çekirdek sürücüsü gerektirir; bu nedenle Windows'ta 2. yöntem (com0com) kullanılır. Linux/Jetson'da
+> 1. yöntem bunu sürücüsüz, sanal portsuz yapar.
 
 ## Kaynaktan çalıştırma / derleme (geliştirici için)
 
