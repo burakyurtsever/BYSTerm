@@ -426,20 +426,32 @@ class Transport:
             self._txq.put((bytes(data), target))
 
     def close(self):
+        """Durdur: once bekleyen okuma/yazmayi KES, is parcaciklarinin cikmasini bekle, SONRA
+        portu/soketi kapat (Windows suruculeri, baska thread kullanirken kapatilan tutamaca takilabilir)."""
         with self._lock:
             already = self._stop.is_set()
             self._stop.set()
             self._closed_emitted = True
         self._txq.put(None)
-        if not already:
+        try:
+            self._interrupt()
+        except Exception:
+            pass
+        cur = threading.current_thread()
+        for t in self._threads:
+            if t is not cur:
+                t.join(timeout=2.0)
+        if not already or self._needs_release():
             try:
                 self._release()
             except Exception:
                 pass
-        cur = threading.current_thread()
-        for t in self._threads:
-            if t is not cur:
-                t.join(timeout=1.5)
+
+    def _interrupt(self):
+        """Bloklanmis okuma/yazmayi uyandir (kapatmadan)."""
+
+    def _needs_release(self):
+        return False
 
     @property
     def running(self):
@@ -546,7 +558,13 @@ class SerialTransport(Transport):
         self.description = cfg.short()
 
     def _open_and_run(self):
-        self.ser = self.cfg.open()
+        ser = self.cfg.open()
+        if self._stop.is_set():
+            # kullanici port ACILIRKEN iptal etti (Windows'ta Bluetooth/sanal COM acilisi saniyeler surebilir):
+            # portu acik birakma
+            ser.close()
+            return
+        self.ser = ser
         self._state('open', f'{self.cfg.short()} acildi')
         self._spawn(self._writer, name='tx')
         gap, chunk = _gap_for_baud(self.cfg.baudrate), _chunk_for_baud(self.cfg.baudrate)
@@ -571,7 +589,7 @@ class SerialTransport(Transport):
             return
         self._data(TX, data)
 
-    def _release(self):
+    def _interrupt(self):
         s = self.ser
         if s is not None:
             for fn in (s.cancel_read, s.cancel_write):
@@ -579,6 +597,14 @@ class SerialTransport(Transport):
                     fn()
                 except Exception:
                     pass
+
+    def _needs_release(self):
+        return self.ser is not None and self.ser.is_open
+
+    def _release(self):
+        s = self.ser
+        if s is not None:
+            self._interrupt()
             try:
                 s.close()
             except Exception:
@@ -944,6 +970,9 @@ class SerialBridge(Transport):
         if not self.virtual:
             raise ValueError('Sanal/ikinci port belirtilmedi')
         self.ser = self.cfg.open()
+        if self._stop.is_set():
+            self.ser.close()
+            return
         try:
             if self._use_pty():
                 self.pty = _PtyEnd(self.virtual)
@@ -1120,7 +1149,7 @@ class SerialBridge(Transport):
             return False
         return not any(e & select.POLLHUP for _, e in ev)
 
-    def _release(self):
+    def _interrupt(self):
         for s in (self.ser, self.vser):
             if s is not None:
                 for fn in (s.cancel_read, s.cancel_write):
@@ -1128,6 +1157,14 @@ class SerialBridge(Transport):
                         fn()
                     except Exception:
                         pass
+
+    def _needs_release(self):
+        return any(s is not None and s.is_open for s in (self.ser, self.vser))
+
+    def _release(self):
+        self._interrupt()
+        for s in (self.ser, self.vser):
+            if s is not None:
                 try:
                     s.close()
                 except Exception:

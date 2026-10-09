@@ -28,6 +28,7 @@ import json
 import time
 import socket
 import threading
+import subprocess
 import collections
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -38,7 +39,8 @@ if '--net-helper' in sys.argv:          # yonetici yardimcisi (root): Qt/pyseria
     sys.exit(0)
 
 try:
-    import serial  # noqa: F401
+    import serial
+    PYSERIAL_VERSION = serial.VERSION
 except ImportError:
     sys.stderr.write('pyserial eksik:  pip install pyserial\n')
     sys.exit(1)
@@ -75,6 +77,9 @@ if QT_API is None:
 
 import bysterm_core as core   # noqa: E402
 import bysterm_net as net   # noqa: E402
+import bysterm_update as upd   # noqa: E402
+from bysterm_i18n import tr, set_lang, LANGS   # noqa: E402
+
 from bysterm_core import RX, TX  # noqa: E402
 
 APP_NAME = 'BYSTerm'
@@ -197,6 +202,147 @@ class Terminal(W.QPlainTextEdit):
             sb.setValue(sb.maximum())
 
 
+# =========================================================================== akan yerlesim
+class FlowLayout(W.QLayout):
+    """Dar pencerede alt satira kayan yatay yerlesim (Terminator tarzi bolmeler icin).
+
+    * Bir QLabel ile ardindan gelen kutu BIRLIKTE tasinir ("Baud [115200]" bolunmez).
+    * addWidget(w, stretch>0) olan ogeler satirda kalan boslugu doldurur.
+    * QHBoxLayout'un addWidget/addSpacing/addStretch cagrilariyla uyumludur.
+    """
+
+    def __init__(self, parent=None, hspacing=6, vspacing=4):
+        super().__init__(parent)
+        self._items = []
+        self._stretch = {}
+        self.hs, self.vs = hspacing, vspacing
+        self._h = 0          # mevcut genislikte gereken yukseklik (ust yerlesime bildirilir)
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def addWidget(self, w, stretch=0, *args, **kw):
+        super().addWidget(w)
+        if stretch and self._items:
+            self._stretch[id(self._items[-1])] = stretch
+
+    def addSpacing(self, n):
+        self.addItem(W.QSpacerItem(int(n), 1))
+
+    def addStretch(self, *args):
+        pass
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, i):
+        return self._items[i] if 0 <= i < len(self._items) else None
+
+    def takeAt(self, i):
+        if 0 <= i < len(self._items):
+            it = self._items.pop(i)
+            self._stretch.pop(id(it), None)
+            return it
+        return None
+
+    def expandingDirections(self):
+        for f in (lambda: Qt.Orientations(0), lambda: Qt.Orientation(0)):
+            try:
+                return f()
+            except Exception:
+                continue
+        return 0
+
+    def hasHeightForWidth(self):
+        return False      # Qt ic ice heightForWidth'i guvenilir yaymiyor: yukseklik _h ile bildirilir
+
+    def heightForWidth(self, width):
+        return self._do(QtCore.QRect(0, 0, width, 0), True)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        h = self._do(rect, False)
+        if h != self._h:
+            self._h = h
+            QtCore.QTimer.singleShot(0, self._notify)
+
+    def _notify(self):
+        try:
+            self.invalidate()
+            w = self.parentWidget()
+            while w is not None:
+                w.updateGeometry()
+                if isinstance(w, Pane):
+                    break
+                w = w.parentWidget()
+        except RuntimeError:      # widget silinmis
+            pass
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        w = h = 0
+        for unit in self._units():
+            uw = sum(it.minimumSize().width() if not it.spacerItem() else 0 for it in unit) + self.hs * (len(unit) - 1)
+            w = max(w, uw)
+            h = max(h, max(it.minimumSize().height() for it in unit))
+        m = self.contentsMargins()
+        return QtCore.QSize(w + m.left() + m.right(), max(h + m.top() + m.bottom(), self._h))
+
+    def _units(self):
+        vis = [it for it in self._items if it.spacerItem() is not None or not it.isEmpty()]
+        units, i = [], 0
+        while i < len(vis):
+            it = vis[i]
+            wdg = it.widget()
+            if isinstance(wdg, W.QLabel) and not wdg.wordWrap() and i + 1 < len(vis):
+                units.append([it, vis[i + 1]])
+                i += 2
+            else:
+                units.append([it])
+                i += 1
+        return units
+
+    def _do(self, rect, test):
+        m = self.contentsMargins()
+        r = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
+        width = max(1, r.width())
+        lines, cur, cur_w = [], [], 0
+        for unit in self._units():
+            uw = sum(min(it.sizeHint().width(), width) for it in unit) + self.hs * (len(unit) - 1)
+            if cur and cur_w + self.hs + uw > width:
+                lines.append(cur)
+                cur, cur_w = [], 0
+            cur_w += (self.hs if cur else 0) + uw
+            cur.append(unit)
+        if cur:
+            lines.append(cur)
+        y = r.y()
+        for line in lines:
+            items = [it for unit in line for it in unit]
+            hints = [QtCore.QSize(min(it.sizeHint().width(), width), it.sizeHint().height()) for it in items]
+            used = sum(h.width() for h in hints) + self.hs * (len(items) - 1)
+            extra = max(0, width - used)
+            st = [self._stretch.get(id(it), 0) for it in items]
+            tot = sum(st)
+            widths = [h.width() + (extra * s // tot if tot else 0) for h, s in zip(hints, st)]
+            # ic ice akan yerlesim (ornek: seri ayar paneli) dar alanda kendi icinde satir atlar:
+            # yuksekligi verilen genislige gore sor (heightForWidth)
+            heights = [it.heightForWidth(w) if it.hasHeightForWidth() else h.height()
+                       for it, h, w in zip(items, hints, widths)]
+            heights = [h if h > 0 else hh.height() for h, hh in zip(heights, hints)]
+            lh = max(heights)
+            if not test:
+                x = r.x()
+                for it, w, h in zip(items, widths, heights):
+                    it.setGeometry(QtCore.QRect(x, y + (lh - h) // 2, w, h))
+                    x += w + self.hs
+            y += lh + self.vs
+        return y - self.vs - r.y() + m.top() + m.bottom() if lines else m.top() + m.bottom()
+
+
 # =========================================================================== seri ayar paneli
 class SerialSettings(W.QWidget):
     """Port + baud + format secimi (Seri ve Seri izleme sekmelerinde ortak)."""
@@ -204,12 +350,11 @@ class SerialSettings(W.QWidget):
     def __init__(self, main, with_port=True, parent=None):
         super().__init__(parent)
         self.main = main
-        lay = W.QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
+        lay = FlowLayout(self)
 
         self.port = W.QComboBox()
         self.port.setEditable(True)
-        self.port.setMinimumWidth(300)
+        self.port.setMinimumWidth(200)
         self.port.setSizeAdjustPolicy(qenum(W.QComboBox, 'SizeAdjustPolicy.AdjustToContents'))
         self.port.lineEdit().setPlaceholderText('Port sec veya yaz (COM3, /dev/ttyUSB0)')
         self.btn_refresh = W.QToolButton()
@@ -335,10 +480,11 @@ class Session(W.QWidget):
         self.conn_box = W.QGroupBox('Baglanti')
         cl = W.QVBoxLayout(self.conn_box)
         cl.setContentsMargins(6, 4, 6, 4)
-        row = W.QHBoxLayout()
+        row = FlowLayout()
         self.build_connection(row, cl)
         self.btn_connect = W.QPushButton(self.connect_text())
         self.btn_connect.setMinimumWidth(110)
+        self.btn_connect.setObjectName('primary')
         self.btn_connect.setDefault(False)
         self.btn_connect.clicked.connect(self.toggle_connection)
         row.addWidget(self.btn_connect)
@@ -346,7 +492,7 @@ class Session(W.QWidget):
         root.addWidget(self.conn_box)
 
         # --- gorunum secenekleri
-        opt = W.QHBoxLayout()
+        opt = FlowLayout()
         self.mode = W.QComboBox()
         self.mode.addItem('ASCII', 'ascii')
         self.mode.addItem('HEX', 'hex')
@@ -400,12 +546,12 @@ class Session(W.QWidget):
 
         # --- gonderme satiri
         self.send_box = W.QWidget()
-        sl = W.QHBoxLayout(self.send_box)
-        sl.setContentsMargins(0, 0, 0, 0)
+        sl = FlowLayout(self.send_box)
         self.send_edit = W.QComboBox()
         self.send_edit.setEditable(True)
         self.send_edit.setInsertPolicy(qenum(W.QComboBox, 'InsertPolicy.NoInsert'))
         self.send_edit.setMaxCount(50)
+        self.send_edit.setMinimumWidth(220)
         self.send_edit.lineEdit().setPlaceholderText('Gonderilecek veri (Enter = gonder)')
         self.send_edit.lineEdit().returnPressed.connect(self.send_now)
         self.send_mode = W.QComboBox()
@@ -583,10 +729,19 @@ class Session(W.QWidget):
         self.transport = None
         self.repeat_timer.stop()
         self.chk_repeat.setChecked(False)
-        t.close()
-        self._drain_transport(t)       # kapanirken gelen son veriler
-        self.info(reason or 'Baglanti kapatildi')
         self.set_connected(False)
+        self.btn_connect.setEnabled(False)
+        self.lbl_state.setText('Kapatiliyor...')
+
+        def done(_r, err):
+            # kapatma arka planda: surucu takilsa bile arayuz donmaz
+            self._drain_transport(t)       # kapanirken gelen son veriler
+            self.info(reason or 'Baglanti kapatildi', 'error' if err else 'info')
+            if err:
+                self.info(f'Kapatma hatasi: {err}', 'error')
+            self.btn_connect.setEnabled(True)
+            self.set_connected(self.transport is not None and self.connected)
+        _bg(self, t.close, done)
 
     def set_busy(self):
         self.btn_connect.setText('Iptal')
@@ -919,7 +1074,7 @@ class SerialSession(Session):
     def build_connection(self, row, col):
         self.ss = SerialSettings(self.main)
         row.addWidget(self.ss, 1)
-        ctl = W.QHBoxLayout()
+        ctl = FlowLayout()
         self.chk_dtr = W.QCheckBox('DTR')
         self.chk_dtr.setChecked(True)
         self.chk_rts = W.QCheckBox('RTS')
@@ -1019,6 +1174,7 @@ class TcpClientSession(Session):
     def build_connection(self, row, col):
         self.host = W.QLineEdit('127.0.0.1')
         self.host.setPlaceholderText('IP veya host adi')
+        self.host.setMinimumWidth(160)
         self.port = W.QSpinBox()
         self.port.setRange(1, 65535)
         self.port.setValue(5000)
@@ -1096,7 +1252,7 @@ class TcpServerSession(Session):
         b.addWidget(self.btn_kick)
         b.addWidget(btn_none)
         lay.addLayout(b)
-        box.setMinimumWidth(200)
+        box.setMinimumWidth(230)
         return box
 
     def _target_label(self):
@@ -1160,6 +1316,7 @@ class UdpSession(Session):
     def build_connection(self, row, col):
         self.rhost = W.QLineEdit('127.0.0.1')
         self.rhost.setPlaceholderText('hedef IP (bos = sadece dinle)')
+        self.rhost.setMinimumWidth(150)
         self.rport = W.QSpinBox()
         self.rport.setRange(0, 65535)
         self.rport.setValue(5001)
@@ -1250,10 +1407,10 @@ class MonitorSession(Session):
         row.addWidget(W.QLabel('Gercek'))
         row.addWidget(self.ss, 1)
 
-        r2 = W.QHBoxLayout()
+        r2 = FlowLayout()
         self.virt = W.QComboBox()
         self.virt.setEditable(True)
-        self.virt.setMinimumWidth(260)
+        self.virt.setMinimumWidth(200)
         self.chk_follow = W.QCheckBox('Uygulamanin baud/format ayarini takip et')
         self.chk_follow.setChecked(True)
         self.chk_follow.setToolTip('Diger uygulama sanal portu hangi baud ile acarsa gercek port '
@@ -1591,7 +1748,7 @@ class NetConfigTab(ToolTab):
             for e in (self.ed_ip, self.ed_gw, self.ed_dns1, self.ed_dns2):
                 e.setValidator(QtGui.QRegularExpressionValidator(rx, self))
         self.btn_apply = W.QPushButton('Uygula')
-        self.btn_apply.setStyleSheet('QPushButton { font-weight: bold; padding: 4px 18px; }')
+        self.btn_apply.setObjectName('primary')
         self.btn_apply.clicked.connect(lambda: self.apply('set'))
         self.btn_add = W.QPushButton('Ek IP olarak ekle')
         self.btn_add.setToolTip('Mevcut IP ve internet bozulmadan bu IP\'yi karta EK olarak ekler\n'
@@ -1885,9 +2042,10 @@ class PingTab(ToolTab):
         self.rows = {}
         root = W.QVBoxLayout(self)
         root.setContentsMargins(6, 6, 6, 4)
-        top = W.QHBoxLayout()
+        top = FlowLayout()
         self.ed_hosts = W.QLineEdit(main.settings.value('ping/hosts', '8.8.8.8') or '8.8.8.8')
         self.ed_hosts.setPlaceholderText('Hedef(ler): 192.168.1.10, 192.168.1.20, google.com')
+        self.ed_hosts.setMinimumWidth(220)
         self.ed_hosts.returnPressed.connect(self.toggle)
         self.sp_int = W.QSpinBox()
         self.sp_int.setRange(10, 60000)
@@ -1907,6 +2065,7 @@ class PingTab(ToolTab):
         self.cb_src = source_ip_combo()
         self.btn = W.QPushButton('Baslat')
         self.btn.setMinimumWidth(100)
+        self.btn.setObjectName('primary')
         self.btn.clicked.connect(self.toggle)
         top.addWidget(W.QLabel('Hedef'))
         top.addWidget(self.ed_hosts, 1)
@@ -2095,11 +2254,12 @@ class ScanTab(ToolTab):
         self.rowmap = {}
         root = W.QVBoxLayout(self)
         root.setContentsMargins(6, 6, 6, 4)
-        top = W.QHBoxLayout()
+        top = FlowLayout()
         self.cb_if = W.QComboBox()
-        self.cb_if.setMinimumWidth(260)
+        self.cb_if.setMinimumWidth(200)
         self.cb_if.currentIndexChanged.connect(self._if_changed)
         self.ed_range = W.QLineEdit('192.168.1.1-254')
+        self.ed_range.setMinimumWidth(200)
         self.ed_range.setPlaceholderText('192.168.1.0/24  veya  192.168.1.1-254  veya  10.0.0.5-10.0.0.40')
         self.ed_range.returnPressed.connect(self.toggle)
         self.sp_to = W.QSpinBox()
@@ -2108,6 +2268,7 @@ class ScanTab(ToolTab):
         self.sp_to.setSuffix(' ms')
         self.btn = W.QPushButton('Tara')
         self.btn.setMinimumWidth(100)
+        self.btn.setObjectName('primary')
         self.btn.clicked.connect(self.toggle)
         top.addWidget(W.QLabel('Ag karti'))
         top.addWidget(self.cb_if)
@@ -2271,13 +2432,14 @@ class IperfTab(ToolTab):
         st = main.settings
         root = W.QVBoxLayout(self)
         root.setContentsMargins(6, 6, 6, 4)
-        r1 = W.QHBoxLayout()
+        r1 = FlowLayout()
         self.rb_client = W.QRadioButton('Istemci (karsiya baglan)')
         self.rb_server = W.QRadioButton('Sunucu (bekle)')
         self.rb_client.setChecked(True)
         self.rb_client.toggled.connect(self._mode)
         self.ed_host = W.QLineEdit(st.value('iperf/host', '') or '')
         self.ed_host.setPlaceholderText('karsi cihazin IP\'si (orada: iperf3 -s)')
+        self.ed_host.setMinimumWidth(180)
         self.ed_host.returnPressed.connect(self.toggle)
         self.sp_port = W.QSpinBox()
         self.sp_port.setRange(1, 65535)
@@ -2303,6 +2465,7 @@ class IperfTab(ToolTab):
         self.cb_src = source_ip_combo()
         self.btn = W.QPushButton('Baslat')
         self.btn.setMinimumWidth(110)
+        self.btn.setObjectName('primary')
         self.btn.clicked.connect(self.toggle)
         r1.addWidget(self.rb_client)
         r1.addWidget(self.rb_server)
@@ -2314,7 +2477,7 @@ class IperfTab(ToolTab):
         r1.addWidget(self.sp_port)
         r1.addWidget(self.btn)
         root.addLayout(r1)
-        r2 = W.QHBoxLayout()
+        r2 = FlowLayout()
         self.opts = []
         for lbl, w in (('Protokol', self.cb_proto), ('Sure', self.sp_time), ('Paralel', self.sp_par),
                        ('Hiz', self.sp_bw), ('Kaynak', self.cb_src)):
@@ -2470,33 +2633,980 @@ ALL_TYPES = SESSION_TYPES + NET_TYPES
 
 
 # =========================================================================== ana pencere
+# =========================================================================== tema / gorsel
+BRAND1, BRAND2 = '#FFB547', '#FF5F6D'      # BYS aile simgesinde BYSTerm'in renk cifti
+THEME = {'dark': True}
+
+_DARK = {
+    'win': '#1b1e24', 'panel': '#14161b', 'base': '#111318', 'alt': '#191c22', 'btn': '#262a32',
+    'border': '#30353e', 'text': '#d7dae0', 'muted': '#8b929c', 'hover': '#2f343d',
+}
+_LIGHT = {
+    'win': '#f3f4f6', 'panel': '#e9ebef', 'base': '#ffffff', 'alt': '#f6f7f9', 'btn': '#ffffff',
+    'border': '#c9ced6', 'text': '#1f2328', 'muted': '#656d76', 'hover': '#e4e7eb',
+}
+
+
+def apply_theme(app, dark=True):
+    THEME['dark'] = dark
+    c = _DARK if dark else _LIGHT
+    app.setStyle('Fusion')
+    pal = QtGui.QPalette()
+    R = QtGui.QPalette
+    roles = {'Window': c['win'], 'WindowText': c['text'], 'Base': c['base'], 'AlternateBase': c['alt'],
+             'ToolTipBase': c['btn'], 'ToolTipText': c['text'], 'Text': c['text'], 'Button': c['btn'],
+             'ButtonText': c['text'], 'BrightText': '#ffffff', 'Highlight': '#e8774f',
+             'HighlightedText': '#ffffff', 'Link': BRAND1, 'PlaceholderText': c['muted']}
+    for name, col in roles.items():
+        role = getattr(R, name, None) or getattr(getattr(R, 'ColorRole', R), name, None)
+        if role is not None:
+            pal.setColor(role, QtGui.QColor(col))
+    dis = qenum(R, 'ColorGroup.Disabled')
+    for name in ('Text', 'ButtonText', 'WindowText'):
+        pal.setColor(dis, qenum(R, f'ColorRole.{name}'), QtGui.QColor(c['muted']))
+    app.setPalette(pal)
+    app.setStyleSheet(f"""
+        QToolTip {{ background: {c['btn']}; color: {c['text']}; border: 1px solid {c['border']}; padding: 4px; }}
+        QPushButton {{ background: {c['btn']}; border: 1px solid {c['border']}; border-radius: 5px;
+                      padding: 4px 9px; min-height: 18px; }}
+        QPushButton:hover {{ border-color: {BRAND1}; background: {c['hover']}; }}
+        QPushButton:pressed {{ background: {c['border']}; }}
+        QPushButton:disabled {{ color: {c['muted']}; border-color: {c['border']}; }}
+        QPushButton:checked {{ background: #5a2e2a; border-color: {BRAND2}; }}
+        QPushButton#primary {{ color: #1b1208; font-weight: bold; border: none;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {BRAND1}, stop:1 {BRAND2}); }}
+        QPushButton#primary:hover {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffc56e, stop:1 #ff7a86); }}
+        QPushButton#primary:disabled {{ background: {c['border']}; color: {c['muted']}; }}
+        QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ background: {c['base']}; border: 1px solid {c['border']};
+            border-radius: 4px; padding: 2px 6px; min-height: 20px; }}
+        QSpinBox, QDoubleSpinBox {{ padding-right: 16px; }}
+        QSpinBox::up-button, QDoubleSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::down-button {{
+            subcontrol-origin: border; width: 16px; border: none; background: transparent; }}
+        QSpinBox::up-button, QDoubleSpinBox::up-button {{ subcontrol-position: top right; }}
+        QSpinBox::down-button, QDoubleSpinBox::down-button {{ subcontrol-position: bottom right; }}
+        QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+        QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{ background: {c['hover']}; }}
+        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{ width: 0; height: 0; border-left: 4px solid transparent;
+            border-right: 4px solid transparent; border-bottom: 5px solid {c['muted']}; }}
+        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{ width: 0; height: 0; border-left: 4px solid transparent;
+            border-right: 4px solid transparent; border-top: 5px solid {c['muted']}; }}
+        QComboBox::drop-down {{ border: none; width: 18px; }}
+        QComboBox::down-arrow {{ width: 0; height: 0; border-left: 4px solid transparent;
+            border-right: 4px solid transparent; border-top: 5px solid {c['muted']}; }}
+        QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{ border-color: {BRAND1}; }}
+        QComboBox QAbstractItemView {{ background: {c['base']}; selection-background-color: #e8774f; }}
+        QGroupBox {{ border: 1px solid {c['border']}; border-radius: 6px; margin-top: 14px; padding-top: 6px; }}
+        QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: {BRAND1}; font-weight: bold; }}
+        QTableWidget, QListWidget {{ background: {c['base']}; alternate-background-color: {c['alt']};
+            border: 1px solid {c['border']}; border-radius: 4px; gridline-color: {c['border']}; }}
+        QHeaderView::section {{ background: {c['btn']}; border: none; border-right: 1px solid {c['border']};
+            border-bottom: 1px solid {c['border']}; padding: 3px 6px; color: {c['muted']}; font-weight: bold; }}
+        QSplitter::handle {{ background: {c['panel']}; }}
+        QSplitter::handle:hover {{ background: {BRAND1}; }}
+        QScrollBar:vertical {{ background: transparent; width: 10px; margin: 0; }}
+        QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 0; }}
+        QScrollBar::handle {{ background: {c['border']}; border-radius: 4px; min-height: 24px; min-width: 24px; }}
+        QScrollBar::handle:hover {{ background: {c['muted']}; }}
+        QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
+        QToolBar {{ background: {c['panel']}; border: none; border-bottom: 1px solid {c['border']}; spacing: 6px; padding: 3px; }}
+        QStatusBar {{ background: {c['panel']}; color: {c['muted']}; border-top: 1px solid {c['border']}; }}
+        QMenu {{ background: {c['btn']}; border: 1px solid {c['border']}; padding: 4px; }}
+        QMenu::item {{ padding: 5px 22px; border-radius: 4px; }}
+        QMenu::item:selected {{ background: #e8774f; color: white; }}
+        QProgressBar {{ border: 1px solid {c['border']}; border-radius: 4px; text-align: center; background: {c['base']}; }}
+        QProgressBar::chunk {{ border-radius: 3px;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {BRAND1}, stop:1 {BRAND2}); }}
+        #sidebar {{ background: {c['panel']}; }}
+        #sidebarBrand {{ color: {c['text']}; }}
+    """)
+
+
+def draw_bys_icon(g, s, c1=BRAND1, c2=BRAND2, pads=1.0, text=1.0, cursor=True, x0=0.0, y0=0.0):
+    """BYS aile simgesi (ci/make_icon.py ile ayni tasarim). pads/text 0..1: acilis animasyonu icin."""
+    import math
+
+    def grad(a, b, angle, alpha=255):
+        r = math.radians(angle)
+        dx, dy = math.cos(r), math.sin(r)
+        half = (abs(dx) + abs(dy)) * s / 2.0
+        cx, cy = x0 + s / 2.0, y0 + s / 2.0
+        gr = QtGui.QLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half)
+        ca, cb = QtGui.QColor(a), QtGui.QColor(b)
+        ca.setAlpha(alpha)
+        cb.setAlpha(alpha)
+        gr.setColorAt(0, ca)
+        gr.setColorAt(1, cb)
+        return QtGui.QBrush(gr)
+
+    def rr(x, y, w, h, r):
+        p = QtGui.QPainterPath()
+        d = max(0.5, min(2 * r, min(w, h)))
+        p.addRoundedRect(QtCore.QRectF(x0 + x, y0 + y, w, h), d / 2, d / 2)
+        return p
+    m = max(1.0, s * 0.03)
+    g.fillPath(rr(m, m, s - 2 * m, s - 2 * m, s * 0.22), grad('#1A2140', '#070A14', 60))
+    acc = grad(c1, c2, 35)
+    n, ln, pw, span = 6, s * 0.05, s * 0.034, s * 0.54
+    st, edge = (s - span) / 2, s * 0.078
+    total = n * 4
+    lit = pads * total
+    k = 0
+    for side in range(4):
+        for i in range(n):
+            a = max(0.0, min(1.0, lit - k))
+            k += 1
+            if a <= 0:
+                continue
+            o = st + span * i / (n - 1) - pw / 2
+            r = pw * 0.35
+            brush = grad(c1, c2, 35, int(40 + 70 * a + (110 if a < 1 else 0) * (1 - a)))
+            if side == 0:
+                g.fillPath(rr(o, edge, pw, ln, r), brush)
+            elif side == 1:
+                g.fillPath(rr(s - edge - ln, o, ln, pw, r), brush)
+            elif side == 2:
+                g.fillPath(rr(s - o - pw, s - edge - ln, pw, ln, r), brush)
+            else:
+                g.fillPath(rr(edge, s - o - pw, ln, pw, r), brush)
+    d = s * 0.05
+    e = QtGui.QPainterPath()
+    e.addEllipse(QtCore.QRectF(x0 + s * 0.17, y0 + s * 0.17, d, d))
+    g.fillPath(e, acc)
+    if text > 0:
+        f = QtGui.QFont('DejaVu Sans Mono')
+        f.setStyleHint(qenum(QtGui.QFont, 'StyleHint.Monospace'))
+        f.setBold(True)
+        f.setPixelSize(100)
+        path = QtGui.QPainterPath()
+        path.addText(0, 0, f, 'BYS')
+        b = path.boundingRect()
+        kk = min(s * 0.54 / b.width(), s * 0.27 / b.height())
+        t = QtGui.QTransform()
+        t.translate(x0 + s * 0.45, y0 + s * 0.50)
+        t.scale(kk, kk)
+        t.translate(-(b.x() + b.width() / 2), -(b.y() + b.height() / 2))
+        tp = t.map(path)
+        col = QtGui.QColor('#F4F6FF')
+        col.setAlphaF(max(0.0, min(1.0, text)))
+        g.fillPath(tp, QtGui.QBrush(col))
+        if cursor:
+            bb = tp.boundingRect()
+            g.fillPath(rr(bb.right() - x0 + s * 0.035, bb.bottom() - y0 - s * 0.05, s * 0.115, s * 0.05, s * 0.012), acc)
+
+
+def tool_icon(kind, size=18):
+    """Sol paneldeki arac simgeleri (elle cizilir, her sistemde ayni)."""
+    pm = QtGui.QPixmap(size, size)
+    pm.fill(QtGui.QColor(0, 0, 0, 0))
+    p = QtGui.QPainter(pm)
+    p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+    gr = QtGui.QLinearGradient(0, 0, size, size)
+    gr.setColorAt(0, QtGui.QColor(BRAND1))
+    gr.setColorAt(1, QtGui.QColor(BRAND2))
+    pen = QtGui.QPen(QtGui.QBrush(gr), 1.6)
+    p.setPen(pen)
+    s = float(size)
+    F = QtCore.QPointF
+    R = QtCore.QRectF
+    if kind == 'serial':          # DB9 konnektor
+        path = QtGui.QPainterPath()
+        path.moveTo(2, 5)
+        path.lineTo(s - 2, 5)
+        path.lineTo(s - 4, s - 5)
+        path.lineTo(4, s - 5)
+        path.closeSubpath()
+        p.drawPath(path)
+        p.setBrush(QtGui.QBrush(gr))
+        for x in (5.5, 9, 12.5):
+            p.drawEllipse(F(x * s / 18, 8.2 * s / 18), 0.9, 0.9)
+        for x in (7.2, 10.8):
+            p.drawEllipse(F(x * s / 18, 11 * s / 18), 0.9, 0.9)
+    elif kind == 'tcpc':          # baglanti oku
+        p.drawEllipse(F(4, s / 2), 2.2, 2.2)
+        p.drawLine(F(7, s / 2), F(s - 3, s / 2))
+        p.drawLine(F(s - 7, s / 2 - 4), F(s - 3, s / 2))
+        p.drawLine(F(s - 7, s / 2 + 4), F(s - 3, s / 2))
+    elif kind == 'tcps':          # sunucu
+        for i in range(3):
+            p.drawRoundedRect(R(3, 2.5 + i * 4.6, s - 6, 3.6), 1, 1)
+            p.drawPoint(F(s - 6, 4.3 + i * 4.6))
+    elif kind == 'udp':           # yayin
+        p.setBrush(QtGui.QBrush(gr))
+        p.drawEllipse(F(4, s - 4), 1.6, 1.6)
+        p.setBrush(QtCore.Qt.NoBrush)
+        for rad in (6, 10, 14):
+            p.drawArc(R(4 - rad, s - 4 - rad, 2 * rad, 2 * rad), 0, 90 * 16)
+    elif kind == 'monitor':       # goz
+        path = QtGui.QPainterPath()
+        path.moveTo(2, s / 2)
+        path.quadTo(s / 2, 2, s - 2, s / 2)
+        path.quadTo(s / 2, s - 2, 2, s / 2)
+        p.drawPath(path)
+        p.setBrush(QtGui.QBrush(gr))
+        p.drawEllipse(F(s / 2, s / 2), 2.4, 2.4)
+    elif kind == 'netcfg':        # ethernet jaki
+        path = QtGui.QPainterPath()
+        path.moveTo(3, 4)
+        path.lineTo(s - 3, 4)
+        path.lineTo(s - 3, s - 6)
+        path.lineTo(s - 6, s - 6)
+        path.lineTo(s - 6, s - 3)
+        path.lineTo(6, s - 3)
+        path.lineTo(6, s - 6)
+        path.lineTo(3, s - 6)
+        path.closeSubpath()
+        p.drawPath(path)
+        for x in range(4):
+            p.drawLine(F(6 + x * 2, 6.5), F(6 + x * 2, 9))
+    elif kind == 'ping':          # radar
+        p.setBrush(QtGui.QBrush(gr))
+        p.drawEllipse(F(s / 2, s / 2), 1.8, 1.8)
+        p.setBrush(QtCore.Qt.NoBrush)
+        p.drawEllipse(F(s / 2, s / 2), 4.5, 4.5)
+        p.drawEllipse(F(s / 2, s / 2), 7.5, 7.5)
+    elif kind == 'scan':          # buyutec
+        p.drawEllipse(F(7.5, 7.5), 4.6, 4.6)
+        p.setPen(QtGui.QPen(QtGui.QBrush(gr), 2.4))
+        p.drawLine(F(11, 11), F(s - 2.5, s - 2.5))
+    elif kind == 'iperf':         # hiz gostergesi
+        p.drawArc(R(2, 4, s - 4, s - 4), 0, 180 * 16)
+        p.drawLine(F(s / 2, s / 2 + 2), F(s - 5, 6))
+        p.setBrush(QtGui.QBrush(gr))
+        p.drawEllipse(F(s / 2, s / 2 + 2), 1.6, 1.6)
+    p.end()
+    return QtGui.QIcon(pm)
+
+
+class Splash(W.QWidget):
+    """Acilis animasyonu: cip pedleri sirayla yanar, BYS_ belirir, imlec yanip soner, ad kayarak gelir."""
+    DUR = 1.9
+
+    def __init__(self, on_done):
+        flags = qenum(Qt, 'WindowType.FramelessWindowHint') | qenum(Qt, 'WindowType.SplashScreen') | \
+            qenum(Qt, 'WindowType.WindowStaysOnTopHint')
+        super().__init__(None, flags)
+        self.setAttribute(qenum(Qt, 'WidgetAttribute.WA_TranslucentBackground'))
+        self.resize(560, 330)
+        scr = W.QApplication.primaryScreen() if hasattr(W.QApplication, 'primaryScreen') else None
+        if scr is not None:
+            geo = scr.availableGeometry()
+            self.move(geo.center() - self.rect().center())
+        self.on_done = on_done
+        self.t0 = time.monotonic()
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self._tick)
+        self.timer.start(16)
+
+    def _tick(self):
+        t = time.monotonic() - self.t0
+        if t >= self.DUR:
+            self.timer.stop()
+            self.close()
+            self.on_done()
+            return
+        self.setWindowOpacity(1.0 if t < self.DUR - 0.35 else max(0.0, (self.DUR - t) / 0.35))
+        self.update()
+
+    def paintEvent(self, ev):
+        import math
+        t = time.monotonic() - self.t0
+        p = QtGui.QPainter(self)
+        p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+        r = QtCore.QRectF(self.rect()).adjusted(6, 6, -6, -6)
+        bg = QtGui.QLinearGradient(r.topLeft(), r.bottomRight())
+        bg.setColorAt(0, QtGui.QColor('#1d2233'))
+        bg.setColorAt(1, QtGui.QColor('#0b0d14'))
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(r, 18, 18)
+        p.fillPath(path, QtGui.QBrush(bg))
+        # yumusak isik halesi
+        glow = QtGui.QRadialGradient(QtCore.QPointF(r.left() + 140, r.center().y()), 170)
+        cg = QtGui.QColor(BRAND2)
+        cg.setAlpha(int(70 * min(1.0, t / 0.8)))
+        glow.setColorAt(0, cg)
+        glow.setColorAt(1, QtGui.QColor(0, 0, 0, 0))
+        p.fillPath(path, QtGui.QBrush(glow))
+        pen = QtGui.QPen(QtGui.QColor('#2c3245'), 1)
+        p.setPen(pen)
+        p.drawPath(path)
+        # simge: buyuyerek gelir (ease-out-back)
+        u = min(1.0, t / 0.55)
+        sc = 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2 if u < 1 else 1.0
+        size = 170 * max(0.05, sc)
+        cx, cy = r.left() + 140, r.center().y()
+        draw_bys_icon(p, size, pads=max(0.0, (t - 0.25) / 0.7), text=max(0.0, (t - 0.55) / 0.3),
+                      cursor=(int(t * 3.2) % 2 == 0) or t < 0.9, x0=cx - size / 2, y0=cy - size / 2)
+        # yazi: soldan kayarak + belirerek
+        a = max(0.0, min(1.0, (t - 0.6) / 0.45))
+        dx = 30 * (1 - a) ** 2
+        f = p.font()
+        f.setPixelSize(46)
+        f.setBold(True)
+        p.setFont(f)
+        tg = QtGui.QLinearGradient(QtCore.QPointF(260, 0), QtCore.QPointF(520, 0))
+        c1, c2 = QtGui.QColor(BRAND1), QtGui.QColor(BRAND2)
+        c1.setAlphaF(a)
+        c2.setAlphaF(a)
+        tg.setColorAt(0, c1)
+        tg.setColorAt(1, c2)
+        p.setPen(QtGui.QPen(QtGui.QBrush(tg), 1))
+        p.drawText(QtCore.QRectF(258 + dx, cy - 62, 300, 60), qenum(Qt, 'AlignmentFlag.AlignLeft') |
+                   qenum(Qt, 'AlignmentFlag.AlignBottom'), APP_NAME)
+        f.setPixelSize(14)
+        f.setBold(False)
+        p.setFont(f)
+        col = QtGui.QColor('#c9d1d9')
+        col.setAlphaF(max(0.0, min(1.0, (t - 0.85) / 0.4)))
+        p.setPen(col)
+        p.drawText(QtCore.QRectF(260 + dx, cy + 4, 300, 22), qenum(Qt, 'AlignmentFlag.AlignLeft'),
+                   tr('Serial · TCP · UDP · Network toolkit'))
+        col2 = QtGui.QColor('#6e7681')
+        col2.setAlphaF(col.alphaF())
+        p.setPen(col2)
+        p.drawText(QtCore.QRectF(260 + dx, cy + 28, 300, 20), qenum(Qt, 'AlignmentFlag.AlignLeft'),
+                   f'v{APP_VERSION}  ·  Burak Yurtsever')
+        # alt ilerleme cizgisi: kayan isik
+        y = r.bottom() - 26
+        p.setPen(QtCore.Qt.NoPen)
+        track = QtCore.QRectF(r.left() + 40, y, r.width() - 80, 3)
+        p.fillRect(track, QtGui.QColor('#232838'))
+        prog = min(1.0, t / (self.DUR - 0.35))
+        bar = QtCore.QRectF(track.left(), y, track.width() * (1 - (1 - prog) ** 2), 3)
+        bg2 = QtGui.QLinearGradient(bar.topLeft(), bar.topRight())
+        bg2.setColorAt(0, QtGui.QColor(BRAND1))
+        bg2.setColorAt(1, QtGui.QColor(BRAND2))
+        p.fillRect(bar, QtGui.QBrush(bg2))
+        sh = (t * 1.4) % 1.0
+        shine = QtGui.QRadialGradient(QtCore.QPointF(track.left() + track.width() * sh, y + 1.5), 40)
+        shine.setColorAt(0, QtGui.QColor(255, 255, 255, 110))
+        shine.setColorAt(1, QtGui.QColor(255, 255, 255, 0))
+        p.fillRect(bar, QtGui.QBrush(shine))
+        p.end()
+        del math
+
+
+class AboutDialog(W.QDialog):
+    def __init__(self, main):
+        super().__init__(main)
+        self.main = main
+        self.setWindowTitle(f'{tr("About")} {APP_NAME}')
+        self.setMinimumWidth(560)
+        lay = W.QVBoxLayout(self)
+        lay.setContentsMargins(22, 20, 22, 16)
+        top = W.QHBoxLayout()
+        icon = W.QLabel()
+        pm = QtGui.QPixmap(112, 112)
+        pm.fill(QtGui.QColor(0, 0, 0, 0))
+        pp = QtGui.QPainter(pm)
+        pp.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+        draw_bys_icon(pp, 112)
+        pp.end()
+        icon.setPixmap(pm)
+        top.addWidget(icon)
+        top.addSpacing(14)
+        tl = W.QVBoxLayout()
+        name = W.QLabel(f'<span style="font-size:30px; font-weight:800; color:{BRAND1}">BYS</span>'
+                        f'<span style="font-size:30px; font-weight:800; color:{BRAND2}">Term</span>'
+                        f'&nbsp;&nbsp;<span style="color:#8b929c; font-size:14px">v{APP_VERSION}</span>')
+        tl.addWidget(name)
+        sub = W.QLabel(tr('Serial · TCP · UDP · Network toolkit'))
+        sub.setStyleSheet('color:#8b929c; font-size: 13px;')
+        tl.addWidget(sub)
+        tl.addStretch(1)
+        top.addLayout(tl, 1)
+        lay.addLayout(top)
+        lay.addSpacing(10)
+        txt = W.QLabel(tr('about_text') if tr('about_text') != 'about_text' else (
+            'BYSTerm is a fast test and monitoring tool for embedded and network developers. '
+            'It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, '
+            'IP scanning and iperf3 speed tests together in one window with side-by-side panes. '
+            'It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson '
+            'without any installation.'))
+        txt.setWordWrap(True)
+        txt.setStyleSheet('font-size: 13px; line-height: 140%;')
+        lay.addWidget(txt)
+        lay.addSpacing(10)
+        url = f'https://github.com/{upd.REPO}'
+        info = W.QLabel(
+            f'<table cellspacing="4">'
+            f'<tr><td style="color:#8b929c">{tr("Developer")}</td><td>&nbsp;&nbsp;<b>Burak Yurtsever</b></td></tr>'
+            f'<tr><td style="color:#8b929c">{tr("Source code & releases")}</td>'
+            f'<td>&nbsp;&nbsp;<a style="color:{BRAND1}" href="{url}">{url.replace("https://", "")}</a></td></tr>'
+            f'</table>')
+        info.setOpenExternalLinks(True)
+        info.setTextInteractionFlags(qenum(Qt, 'TextInteractionFlag.TextBrowserInteraction'))
+        lay.addWidget(info)
+        lay.addSpacing(8)
+        bl = W.QHBoxLayout()
+        b_upd = W.QPushButton(tr('Check for updates now'))
+        b_upd.clicked.connect(lambda: main.check_updates(manual=True))
+        b_close = W.QPushButton(tr('Close'))
+        b_close.setObjectName('primary')
+        b_close.clicked.connect(self.accept)
+        bl.addWidget(b_upd)
+        bl.addStretch(1)
+        bl.addWidget(b_close)
+        lay.addLayout(bl)
+
+
+class UpdateDialog(W.QDialog):
+    """Yeni surum bildirimi + indirme/kurulum ilerlemesi."""
+
+    def __init__(self, main, rel):
+        super().__init__(main)
+        self.main, self.rel = main, rel
+        self.setWindowTitle(tr('Update available'))
+        self.setMinimumWidth(520)
+        lay = W.QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 14)
+        head = W.QLabel('<span style="font-size:17px; font-weight:bold">' +
+                        tr('A new version of BYSTerm is available: {new}  (you have {cur})').format(
+                            new=f'<span style="color:{BRAND1}">v{rel["version"]}</span>', cur=f'v{APP_VERSION}') +
+                        '</span>')
+        head.setWordWrap(True)
+        lay.addWidget(head)
+        notes = rel.get('notes', '').strip()
+        if notes:
+            lay.addWidget(W.QLabel(f'<b>{tr("What&#39;s new:")}</b>'.replace('&#39;', "'")))
+            box = W.QPlainTextEdit(notes[:4000])
+            box.setReadOnly(True)
+            box.setMaximumHeight(170)
+            lay.addWidget(box)
+        self.prog = W.QProgressBar()
+        self.prog.hide()
+        lay.addWidget(self.prog)
+        self.status = W.QLabel('')
+        self.status.setStyleSheet('color:#8b929c')
+        lay.addWidget(self.status)
+        bl = W.QHBoxLayout()
+        self.b_skip = W.QPushButton(tr('Skip this version'))
+        self.b_later = W.QPushButton(tr('Later'))
+        self.b_now = W.QPushButton(tr('Update now'))
+        self.b_now.setObjectName('primary')
+        bl.addWidget(self.b_skip)
+        bl.addStretch(1)
+        bl.addWidget(self.b_later)
+        bl.addWidget(self.b_now)
+        lay.addLayout(bl)
+        self.b_skip.clicked.connect(self._skip)
+        self.b_later.clicked.connect(self.reject)
+        self.b_now.clicked.connect(self._update)
+        self._cancel = False
+        self._state = {}
+
+    def _skip(self):
+        self.main.settings.setValue('skip_version', self.rel['version'])
+        self.reject()
+
+    def _open_page(self):
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(self.rel.get('page') or upd.PAGE))
+
+    def _update(self):
+        if not upd.is_frozen():
+            self.status.setText(tr('BYSTerm is running from source; opening the release page.'))
+            self._open_page()
+            return
+        name = upd.asset_name()
+        url = self.rel['assets'].get(name)
+        if not url:
+            self.status.setText(tr('No download for this system was found in the release. Opening the release page.'))
+            self._open_page()
+            return
+        for b in (self.b_now, self.b_skip):
+            b.setEnabled(False)
+        self.b_later.setText(tr('Cancel'))
+        self.b_later.clicked.disconnect()
+        self.b_later.clicked.connect(lambda: setattr(self, '_cancel', True))
+        self.prog.show()
+        self.prog.setRange(0, 0)
+        self.status.setText(tr('Downloading {name}...').format(name=name))
+        st = self._state
+        import tempfile
+
+        def work():
+            fd, tmp = tempfile.mkstemp(prefix='bysterm_', suffix='_' + name,
+                                       dir=os.path.dirname(upd.install_target()) if upd.IS_WIN else None)
+            os.close(fd)
+
+            def prog(done, total):
+                st['done'], st['total'] = done, total
+            upd.download(url, tmp, prog, lambda: self._cancel)
+            return upd.install(tmp)
+        t = QtCore.QTimer(self)
+
+        def tick():
+            if st.get('total'):
+                self.prog.setRange(0, st['total'])
+                self.prog.setValue(st.get('done', 0))
+        t.timeout.connect(tick)
+        t.start(100)
+
+        def done(cmd, err):
+            t.stop()
+            if err:
+                msg = tr('No write permission for {path}. Download the new version manually from the release page.').format(
+                    path=err) if isinstance(err, PermissionError) else str(err)
+                if 'cancelled' in str(err):
+                    self.reject()
+                    return
+                W.QMessageBox.warning(self, tr('Update failed'), msg)
+                self._open_page()
+                self.reject()
+                return
+            W.QMessageBox.information(self, APP_NAME, tr('The update was installed. BYSTerm will now restart.'))
+            try:
+                subprocess.Popen(cmd, close_fds=True)
+            finally:
+                self.main.close()
+                W.QApplication.instance().quit()
+        _bg(self, work, done)
+
+
+# =========================================================================== Terminator tarzi calisma alani
+def _icon(kind, color='#c9d1d9', size=16):
+    """Basliktaki kucuk dugme ikonlari — her sistemde ayni gorunsun diye elle cizilir."""
+    pm = QtGui.QPixmap(size, size)
+    pm.fill(QtGui.QColor(0, 0, 0, 0))
+    p = QtGui.QPainter(pm)
+    p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+    pen = QtGui.QPen(QtGui.QColor(color), 1.6)
+    p.setPen(pen)
+    r = QtCore.QRectF(2.5, 3.5, size - 5, size - 7)
+    if kind in ('hsplit', 'vsplit', 'zoom', 'unzoom'):
+        p.drawRoundedRect(r, 2, 2)
+    if kind == 'hsplit':      # yan yana
+        p.drawLine(QtCore.QPointF(size / 2.0, r.top()), QtCore.QPointF(size / 2.0, r.bottom()))
+    elif kind == 'vsplit':    # alt alta
+        p.drawLine(QtCore.QPointF(r.left(), size / 2.0), QtCore.QPointF(r.right(), size / 2.0))
+    elif kind == 'zoom':
+        p.fillRect(QtCore.QRectF(r.left() + 2, r.top() + 2, r.width() - 4, r.height() - 4), QtGui.QColor(color))
+    elif kind == 'unzoom':
+        p.drawRect(QtCore.QRectF(r.left() + 3, r.top() + 2.5, r.width() - 6, r.height() - 5))
+    elif kind == 'close':
+        p.drawLine(QtCore.QPointF(4, 4), QtCore.QPointF(size - 4, size - 4))
+        p.drawLine(QtCore.QPointF(size - 4, 4), QtCore.QPointF(4, size - 4))
+    elif kind == 'plus':
+        p.setPen(QtGui.QPen(QtGui.QColor(color), 2))
+        p.drawLine(QtCore.QPointF(size / 2.0, 3), QtCore.QPointF(size / 2.0, size - 3))
+        p.drawLine(QtCore.QPointF(3, size / 2.0), QtCore.QPointF(size - 3, size / 2.0))
+    p.end()
+    return QtGui.QIcon(pm)
+
+
+class Pane(W.QFrame):
+    """Tek bir oturumu (Seri, TCP, Ping...) tutan bolme: baslik cubugu + icerik."""
+
+    def __init__(self, ws, session=None):
+        super().__init__()
+        self.ws = ws
+        self.session = None
+        self.setObjectName('pane')
+        lay = W.QVBoxLayout(self)
+        lay.setContentsMargins(1, 1, 1, 1)
+        lay.setSpacing(0)
+        self.header = W.QWidget()
+        self.header.setObjectName('paneHeader')
+        hl = W.QHBoxLayout(self.header)
+        hl.setContentsMargins(8, 2, 4, 2)
+        hl.setSpacing(2)
+        self.title = W.QLabel('')
+        self.title.setObjectName('paneTitle')
+        hl.addWidget(self.title, 1)
+        self.btns = {}
+        for key, tip, fn in (('hsplit', 'Yana bol  (Ctrl+Shift+E)', lambda: ws.split_pane(self, 'h')),
+                             ('vsplit', 'Alta bol  (Ctrl+Shift+O)', lambda: ws.split_pane(self, 'v')),
+                             ('zoom', 'Tam ekran / geri al  (Ctrl+Shift+X)', lambda: ws.toggle_zoom(self)),
+                             ('close', 'Kapat  (Ctrl+Shift+W)', lambda: ws.close_pane(self))):
+            b = W.QToolButton()
+            b.setIcon(_icon(key))
+            b.setToolTip(tip)
+            b.setAutoRaise(True)
+            b.clicked.connect(fn)
+            hl.addWidget(b)
+            self.btns[key] = b
+        lay.addWidget(self.header)
+        self.scroll = W.QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(qenum(W.QFrame, 'Shape.NoFrame'))
+        lay.addWidget(self.scroll, 1)
+        self.body = W.QVBoxLayout()
+        self.body.setContentsMargins(0, 0, 0, 0)
+        self.placeholder = W.QLabel('Bos bolme\n\nSoldaki listeden bir arac secin\n'
+                                    '(adina tiklayin: burada acilir,  + : yanina yeni bolme)')
+        self.placeholder.setAlignment(qenum(Qt, 'AlignmentFlag.AlignCenter'))
+        self.placeholder.setStyleSheet('color:#888; font-size: 13px;')
+        self.scroll.setWidget(self.placeholder)
+        if session is not None:
+            self.set_session(session)
+        self.set_active(False)
+
+    def set_session(self, s):
+        """Oturumu bu bolmeye koy; onceki oturumu dondur (arka planda yasamaya devam eder)."""
+        old = self.session
+        cur = self.scroll.takeWidget()
+        if cur is not None and cur is not old:
+            cur.setParent(self)
+            cur.hide()
+        if old is not None:
+            old.hide()
+            old.setParent(self.ws.holder)
+        self.session = s
+        if s is not None:
+            self.scroll.setWidget(s)
+            s.show()
+        else:
+            self.scroll.setWidget(self.placeholder)
+            self.placeholder.show()
+        self.refresh_title()
+        return old
+
+    def refresh_title(self):
+        s = self.session
+        if s is None:
+            self.title.setText('<span style="color:#888">(bos)</span>')
+            return
+        dot = '<span style="color:#2da44e">●</span> ' if s.connected else ''
+        self.title.setText(f'{dot}<b>{s.tab_label()}</b>')
+
+    def set_active(self, on):
+        self.setProperty('active', 'true' if on else 'false')
+        self.setStyleSheet(
+            '#pane { border: 1px solid %s; }'
+            '#paneHeader { background: %s; }'
+            '#paneTitle { color: %s; }' % (
+                ('#e3b341', '#3a3320', '#f0f0f0') if on else ('#3a3f47', '#2a2e35', '#c9d1d9')))
+
+
+class Workspace(W.QWidget):
+    """Bolmeler agaci: ic ice QSplitter'lar. Bolme ekle / kapat / tam ekran / dolas."""
+
+    def __init__(self, main):
+        super().__init__()
+        self.main = main
+        self.holder = W.QWidget(self)      # gorunmeyen (arka plan) oturumlarin evi
+        self.holder.hide()
+        self.lay = W.QVBoxLayout(self)
+        self.lay.setContentsMargins(0, 0, 0, 0)
+        self.root = None
+        self.active = None
+        self.zoomed = None
+        self._set_root(Pane(self))
+        self.set_active(self.root)
+
+    # -- agac yardimcilari
+    def _set_root(self, w):
+        if self.root is not None:
+            self.lay.removeWidget(self.root)
+        self.root = w
+        self.lay.addWidget(w)
+        w.show()
+
+    def _replace(self, old, new):
+        par = old.parentWidget()
+        if isinstance(par, W.QSplitter):
+            idx = par.indexOf(old)
+            sizes = par.sizes()
+            old.setParent(None)
+            par.insertWidget(idx, new)
+            par.setSizes(sizes)
+        else:
+            self.lay.removeWidget(old)
+            old.setParent(None)
+            self.root = new
+            self.lay.addWidget(new)
+        new.show()
+
+    def panes(self, w=None):
+        w = self.root if w is None else w
+        if isinstance(w, Pane):
+            return [w]
+        out = []
+        if isinstance(w, W.QSplitter):
+            for i in range(w.count()):
+                out += self.panes(w.widget(i))
+        return out
+
+    def pane_of(self, session):
+        for p in self.panes():
+            if p.session is session:
+                return p
+        return None
+
+    def set_active(self, pane):
+        if pane is self.active or pane is None:
+            return
+        if self.active is not None:
+            try:
+                self.active.set_active(False)
+            except RuntimeError:
+                pass
+        self.active = pane
+        pane.set_active(True)
+        self.main.workspace_changed()
+
+    # -- islemler
+    def split_pane(self, pane, orient=None, session=None):
+        """pane'i bol, yeni bolmeye session'i (yoksa bos) koy. orient: 'h' yan yana, 'v' alt alta."""
+        if self.zoomed is not None:
+            self.toggle_zoom(self.zoomed)
+        if orient is None:     # Terminator gibi: uzun kenar yonunde bol
+            orient = 'h' if pane.width() >= pane.height() * 1.2 else 'v'
+        qo = qenum(Qt, 'Orientation.Horizontal' if orient == 'h' else 'Orientation.Vertical')
+        new = Pane(self, session)
+        par = pane.parentWidget()
+        if isinstance(par, W.QSplitter) and par.orientation() == qo:
+            idx = par.indexOf(pane)
+            par.insertWidget(idx + 1, new)
+            n = par.count()
+            tot = sum(par.sizes()) or (par.width() if orient == 'h' else par.height())
+            par.setSizes([tot // n] * n)
+        else:
+            sp = W.QSplitter(qo)
+            sp.setChildrenCollapsible(False)
+            sp.setHandleWidth(5)
+            self._replace(pane, sp)
+            sp.addWidget(pane)
+            sp.addWidget(new)
+            tot = pane.width() if orient == 'h' else pane.height()
+            sp.setSizes([max(1, tot // 2)] * 2)
+            pane.show()
+        new.show()
+        self.set_active(new)
+        return new
+
+    def close_pane(self, pane, ask=True):
+        s = pane.session
+        if s is not None:
+            if ask and not self.main.confirm_close(s):
+                return
+            pane.set_session(None)
+            self.main.destroy_session(s)
+        if self.zoomed is pane:
+            self.toggle_zoom(pane)
+        par = pane.parentWidget()
+        if not isinstance(par, W.QSplitter):
+            pane.refresh_title()        # son bolme: bos kalir
+            return
+        pane.setParent(None)
+        pane.deleteLater()
+        if par.count() == 1:
+            child = par.widget(0)
+            self._replace(par, child)
+            par.deleteLater()
+        rest = self.panes()
+        if self.active is pane or self.active not in rest:
+            self.active = None
+            self.set_active(rest[0])
+
+    def toggle_zoom(self, pane):
+        if self.zoomed is None:
+            self.zoomed = pane
+            self._zoom_vis(self.root, pane)
+            pane.btns['zoom'].setIcon(_icon('unzoom'))
+        else:
+            z, self.zoomed = self.zoomed, None
+            self._zoom_vis(self.root, None)
+            try:
+                z.btns['zoom'].setIcon(_icon('zoom'))
+            except RuntimeError:
+                pass
+        self.set_active(pane)
+
+    def _zoom_vis(self, w, target):
+        """target disindaki her seyi gizle (target None: hepsini goster). True: alt agacta target var."""
+        if isinstance(w, Pane):
+            w.setVisible(target is None or w is target)
+            return w is target
+        if isinstance(w, W.QSplitter):
+            has_any = False
+            for i in range(w.count()):
+                has_any = self._zoom_vis(w.widget(i), target) or has_any
+            w.setVisible(target is None or has_any)
+            return has_any
+        return False
+
+    def show_session(self, s, split=False):
+        """Oturumu goster: gorunuyorsa o bolmeye gec; degilse aktif bolmeye koy (veya yanina ac)."""
+        p = self.pane_of(s)
+        if p is not None:
+            if self.zoomed is not None and self.zoomed is not p:
+                self.toggle_zoom(self.zoomed)
+            self.set_active(p)
+            return p
+        if s.parentWidget() is not self.holder:
+            s.setParent(self.holder)
+        tgt = self.active or self.panes()[0]
+        if split and tgt.session is not None:
+            s.setParent(None)
+            return self.split_pane(tgt, None, s)
+        tgt.set_session(s)
+        self.set_active(tgt)
+        self.main.workspace_changed()
+        return tgt
+
+    def focus_neighbor(self, step):
+        ps = self.panes()
+        if not ps:
+            return
+        i = ps.index(self.active) if self.active in ps else 0
+        self.set_active(ps[(i + step) % len(ps)])
+
+    # -- kaydet / yukle
+    def dump(self, w=None):
+        w = self.root if w is None else w
+        if isinstance(w, Pane):
+            return {'kind': w.session.KIND if w.session else ''}
+        return {'o': 'h' if w.orientation() == qenum(Qt, 'Orientation.Horizontal') else 'v',
+                'sizes': w.sizes(), 'c': [self.dump(w.widget(i)) for i in range(w.count())]}
+
+    def load(self, tree, make):
+        """tree'den bolmeleri kur; make(kind) -> oturum."""
+        def build(t):
+            if 'kind' in t:
+                return Pane(self, make(t['kind']) if t['kind'] else None)
+            sp = W.QSplitter(qenum(Qt, 'Orientation.Horizontal' if t.get('o') == 'h' else 'Orientation.Vertical'))
+            sp.setChildrenCollapsible(False)
+            sp.setHandleWidth(5)
+            for c in t.get('c', []):
+                sp.addWidget(build(c))
+            if t.get('sizes'):
+                sp.setSizes([int(x) for x in t['sizes']])
+            return sp
+        new = build(tree)
+        old = self.root
+        self._replace(old, new)
+        old.deleteLater()
+        self.active = None
+        self.set_active(self.panes()[0])
+
+
+class Sidebar(W.QWidget):
+    """Sol panel: araclar (adina tikla = aktif bolmede ac, + = yanina yeni bolme) ve acik pencereler."""
+
+    GROUPS = (('BAGLANTI', None), ('AG ARACLARI', None))
+
+    def __init__(self, main):
+        super().__init__()
+        self.main = main
+        self.setMinimumWidth(170)
+        lay = W.QVBoxLayout(self)
+        lay.setContentsMargins(6, 6, 2, 6)
+        lay.setSpacing(2)
+        self.setObjectName('sidebar')
+        self.setAttribute(qenum(Qt, 'WidgetAttribute.WA_StyledBackground'))
+        self.setStyleSheet('QPushButton#tool { text-align: left; padding: 6px 8px; border: none; border-radius: 5px;'
+                           ' background: transparent; }'
+                           'QPushButton#tool:hover { background: rgba(255,181,71,0.13); }'
+                           'QToolButton { border: none; border-radius: 4px; }'
+                           'QToolButton:hover { background: rgba(126,231,135,0.18); }'
+                           'QLabel#grp { color: #8b929c; font-size: 10px; font-weight: bold; letter-spacing: 1px;'
+                           ' padding: 10px 2px 3px 6px; }')
+        brand = W.QHBoxLayout()
+        ic = W.QLabel()
+        pm = QtGui.QPixmap(34, 34)
+        pm.fill(QtGui.QColor(0, 0, 0, 0))
+        pp = QtGui.QPainter(pm)
+        pp.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+        draw_bys_icon(pp, 34)
+        pp.end()
+        ic.setPixmap(pm)
+        nm = W.QLabel(f'<span style="font-size:17px; font-weight:800; color:{BRAND1}">BYS</span>'
+                      f'<span style="font-size:17px; font-weight:800; color:{BRAND2}">Term</span>'
+                      f'<br><span style="color:#8b929c; font-size:10px">v{APP_VERSION}</span>')
+        nm.setObjectName('sidebarBrand')
+        brand.addWidget(ic)
+        brand.addWidget(nm, 1)
+        lay.addLayout(brand)
+        for gi, (title, types) in enumerate((('BAGLANTI', SESSION_TYPES), ('AG ARACLARI', NET_TYPES))):
+            g = W.QLabel(title)
+            g.setObjectName('grp')
+            lay.addWidget(g)
+            for cls in types:
+                row = W.QHBoxLayout()
+                row.setSpacing(0)
+                b = W.QPushButton(cls.TITLE)
+                b.setObjectName('tool')
+                b.setIcon(tool_icon(cls.KIND))
+                b.setIconSize(QtCore.QSize(18, 18))
+                b.setToolTip(f'{cls.TITLE}: aktif bolmede ac (varsa mevcut olana gec)')
+                b.clicked.connect(lambda _=False, c=cls: main.open_tool(c, split=False))
+                plus = W.QToolButton()
+                plus.setIcon(_icon('plus', '#7ee787'))
+                plus.setAutoRaise(True)
+                plus.setToolTip(f'Yeni {cls.TITLE}: aktif bolmenin YANINA ac (Terminator gibi)')
+                plus.clicked.connect(lambda _=False, c=cls: main.open_tool(c, split=True))
+                row.addWidget(b, 1)
+                row.addWidget(plus)
+                lay.addLayout(row)
+        g = W.QLabel('ACIK PENCERELER')
+        g.setObjectName('grp')
+        lay.addWidget(g)
+        self.open = W.QListWidget()
+        self.open.setToolTip('Tikla: o pencereye gec (arka plandaysa aktif bolmede acilir)\nSag tik: yanina ac / kapat')
+        self.open.itemClicked.connect(self._clicked)
+        self.open.setContextMenuPolicy(qenum(Qt, 'ContextMenuPolicy.CustomContextMenu'))
+        self.open.customContextMenuRequested.connect(self._menu)
+        lay.addWidget(self.open, 1)
+        hint = W.QLabel('Ctrl+Shift+E yana bol · O alta bol\nX tam ekran · W kapat · Ctrl+Tab gec')
+        hint.setStyleSheet('color:#777; font-size: 10px;')
+        lay.addWidget(hint)
+
+    def refresh(self, sessions, ws):
+        self.open.clear()
+        for s in sessions:
+            vis = ws.pane_of(s) is not None
+            it = W.QListWidgetItem(('● ' if s.connected else '○ ') + s.tab_label() + ('' if vis else '   (arka planda)'))
+            it.setData(qenum(Qt, 'ItemDataRole.UserRole'), id(s))
+            col = '#2da44e' if s.connected else (None if vis else '#888')
+            if col:
+                it.setForeground(QtGui.QBrush(QtGui.QColor(col)))
+            if ws.active is not None and ws.active.session is s:
+                f = it.font()
+                f.setBold(True)
+                it.setFont(f)
+            self.open.addItem(it)
+
+    def _session(self, item):
+        sid = item.data(qenum(Qt, 'ItemDataRole.UserRole'))
+        for s in self.main.sessions:
+            if id(s) == sid:
+                return s
+        return None
+
+    def _clicked(self, item):
+        s = self._session(item)
+        if s:
+            self.main.ws.show_session(s)
+
+    def _menu(self, pos):
+        item = self.open.itemAt(pos)
+        if not item:
+            return
+        s = self._session(item)
+        if not s:
+            return
+        m = W.QMenu(self)
+        m.addAction('Aktif bolmede goster').triggered.connect(lambda: self.main.ws.show_session(s))
+        m.addAction('Yanina ac').triggered.connect(lambda: self.main.ws.show_session(s, split=True))
+        m.addSeparator()
+        m.addAction('Kapat').triggered.connect(lambda: self.main.close_session(s))
+        qexec_at(m, self.open.viewport().mapToGlobal(pos))
+
+
 class MainWindow(W.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f'{APP_NAME} {APP_VERSION} — Seri / TCP / UDP test')
-        self.resize(1200, 760)
+        self.setWindowTitle(f'{APP_NAME} {APP_VERSION}')
+        self.resize(1400, 860)
         self.settings = QtCore.QSettings(APP_NAME, APP_NAME)
         self.last_dir = str(self.settings.value('last_dir', os.path.expanduser('~')))
         self.ports = core.list_serial_ports()
         self._port_keys = [p.key() for p in self.ports]
-
         self.ifaces = []
-        tb = self.addToolBar('Yeni')
+        self.sessions = []
+
+        tb = self.addToolBar('Ana')
         tb.setMovable(False)
-        newbtn = W.QToolButton()
-        newbtn.setText('  + Yeni sekme  ')
-        newbtn.setPopupMode(qenum(W.QToolButton, 'ToolButtonPopupMode.InstantPopup'))
-        nm = W.QMenu(newbtn)
-        for i, cls in enumerate(ALL_TYPES):
-            if i == len(SESSION_TYPES):
-                nm.addSeparator()
-            nm.addAction(cls.TITLE).triggered.connect(lambda _=False, c=cls: self.add_session(c))
-        newbtn.setMenu(nm)
-        tb.addWidget(newbtn)
-        tb.addSeparator()
-        for cls in (SerialSession, TcpClientSession, PingTab, IperfTab):
-            tb.addAction('+ ' + cls.TITLE).triggered.connect(lambda _=False, c=cls: self.add_session(c))
-        tb.addSeparator()
         setb = W.QToolButton()
         setb.setText('  Ayarlar  ')
         setb.setPopupMode(qenum(W.QToolButton, 'ToolButtonPopupMode.InstantPopup'))
@@ -2506,20 +3616,45 @@ class MainWindow(W.QMainWindow):
         self.act_admin.setChecked(str(self.settings.value('ask_admin', 'true')).lower() in ('1', 'true'))
         self.act_admin.toggled.connect(lambda v: self.settings.setValue('ask_admin', v))
         sm.addAction('Yonetici iznini simdi iste').triggered.connect(self.request_admin)
+        sm.addSeparator()
+        lm = sm.addMenu(tr('Language') + ' / Dil')
+        cur = self.settings.value('lang', 'en')
+        for code, label in LANGS:
+            a = lm.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(code == cur)
+            a.triggered.connect(lambda _=False, c=code: self.set_language(c))
+        tm = sm.addMenu(tr('Theme'))
+        dark = str(self.settings.value('theme', 'dark')) != 'light'
+        for code, label in (('dark', tr('Dark')), ('light', tr('Light'))):
+            a = tm.addAction(label)
+            a.setCheckable(True)
+            a.setChecked((code == 'dark') == dark)
+            a.triggered.connect(lambda _=False, c=code: self.set_theme(c))
+        for key, label, default in (('splash', tr('Show startup animation'), 'true'),
+                                    ('check_updates', tr('Check for updates at startup'), 'true')):
+            a = sm.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(str(self.settings.value(key, default)).lower() in ('1', 'true'))
+            a.toggled.connect(lambda v, k=key: self.settings.setValue(k, v))
+        sm.addAction(tr('Check for updates now')).triggered.connect(lambda: self.check_updates(manual=True))
+        sm.addSeparator()
+        sm.addAction('Pencere duzenini sifirla').triggered.connect(self.reset_layout)
         setb.setMenu(sm)
         tb.addWidget(setb)
-        tb.addAction('Hakkinda').triggered.connect(self.about)
+        tb.addAction(tr('About')).triggered.connect(self.about)
 
-        self.tabs = W.QTabWidget()
-        self.tabs.setTabsClosable(True)
-        self.tabs.setMovable(True)
-        self.tabs.setDocumentMode(True)
-        self.tabs.tabCloseRequested.connect(self.close_tab)
-        self.setCentralWidget(self.tabs)
-
-        for cls in ALL_TYPES:
-            self.add_session(cls, focus=False)
-        self.tabs.setCurrentIndex(0)
+        # sol panel (araclar) | sag: Terminator tarzi bolmeler
+        self.ws = Workspace(self)
+        self.sidebar = Sidebar(self)
+        split = W.QSplitter(qenum(Qt, 'Orientation.Horizontal'))
+        split.addWidget(self.sidebar)
+        split.addWidget(self.ws)
+        split.setStretchFactor(1, 1)
+        split.setSizes([210, 1190])
+        split.setChildrenCollapsible(False)
+        self.setCentralWidget(split)
+        self._shortcuts()
 
         self.statusBar().showMessage(f'{len(self.ports)} seri port bulundu   |   Qt: {QT_API}', 5000)
         self.lbl_admin = W.QLabel()
@@ -2527,6 +3662,7 @@ class MainWindow(W.QMainWindow):
         self.lbl_ports = W.QLabel()
         self.statusBar().addPermanentWidget(self.lbl_ports)
         self._update_port_label()
+        self._restore_layout()
 
         # port tarama arka planda (Windows'ta comports() onlarca ms surebilir)
         self._scan_result = None
@@ -2544,6 +3680,51 @@ class MainWindow(W.QMainWindow):
                 self.restoreGeometry(geo)
             except Exception:
                 pass
+
+    # -- kisayollar (Terminator ile ayni)
+    def _shortcuts(self):
+        Act = getattr(QtGui, 'QAction', None) or getattr(W, 'QAction')
+        for keys, fn in (('Ctrl+Shift+E', lambda: self.ws.split_pane(self.ws.active, 'h')),
+                         ('Ctrl+Shift+O', lambda: self.ws.split_pane(self.ws.active, 'v')),
+                         ('Ctrl+Shift+X', lambda: self.ws.toggle_zoom(self.ws.active)),
+                         ('Ctrl+Shift+W', lambda: self.ws.close_pane(self.ws.active)),
+                         ('Ctrl+Tab', lambda: self.ws.focus_neighbor(1)),
+                         ('Ctrl+Shift+Tab', lambda: self.ws.focus_neighbor(-1))):
+            a = Act(self)
+            a.setShortcut(QtGui.QKeySequence(keys))
+            a.setShortcutContext(qenum(Qt, 'ShortcutContext.ApplicationShortcut'))
+            a.triggered.connect(fn)
+            self.addAction(a)
+
+    # -- duzen
+    def _restore_layout(self):
+        raw = self.settings.value('layout', '')
+        try:
+            tree = json.loads(raw) if raw else None
+        except ValueError:
+            tree = None
+        kinds = {c.KIND: c for c in ALL_TYPES}
+        if tree:
+            try:
+                self.ws.load(tree, lambda k: self.create_session(kinds[k]) if k in kinds else None)
+                return
+            except Exception as e:     # noqa: BLE001
+                sys.stderr.write(f'duzen yuklenemedi: {e}\n')
+        self.ws.show_session(self.create_session(SerialSession))
+
+    def reset_layout(self):
+        for p in list(self.ws.panes())[1:]:
+            self.ws.close_pane(p)
+        self.workspace_changed()
+
+    def workspace_changed(self):
+        ws = getattr(self, 'ws', None)
+        if ws is None:
+            return
+        if hasattr(self, 'sidebar'):
+            self.sidebar.refresh(self.sessions, ws)
+        if getattr(ws, 'active', None) is not None and ws.active.session is not None:
+            self.setWindowTitle(f'{APP_NAME} {APP_VERSION} — {self.ws.active.session.tab_label()}')
 
     # -- portlar
     def _scan_loop(self):
@@ -2576,54 +3757,97 @@ class MainWindow(W.QMainWindow):
             msg.append('Cikarilan port: ' + ', '.join(sorted(removed)))
         if msg:
             self.statusBar().showMessage('   |   '.join(msg), 8000)
-        for i in range(self.tabs.count()):
-            self.tabs.widget(i).update_ports(ports)
+        for w in self.sessions:
+            w.update_ports(ports)
         self._update_port_label()
 
     def _update_port_label(self):
         self.lbl_ports.setText(f'Seri portlar: {len(self.ports)}  ')
         self.lbl_ports.setToolTip('\n'.join(p.label for p in self.ports) or 'Port yok')
 
-    # -- sekmeler
-    def add_session(self, cls, focus=True):
+    # -- oturumlar
+    def create_session(self, cls):
         s = cls(self)
-        idx = self.tabs.addTab(s, s.tab_label())
-        if focus:
-            self.tabs.setCurrentIndex(idx)
+        s.setParent(self.ws.holder)
+        self.sessions.append(s)
+        self.workspace_changed()
         return s
 
-    def close_tab(self, idx):
-        w = self.tabs.widget(idx)
-        if w.transport is not None or getattr(w, 'is_busy', lambda: False)():
-            r = W.QMessageBox.question(self, 'Sekmeyi kapat', 'Baglanti / test calisiyor. Kapatilsin mi?')
-            if r != qenum(W.QMessageBox, 'StandardButton.Yes'):
-                return
-        w.shutdown()
-        self.tabs.removeTab(idx)
-        w.deleteLater()
+    def open_tool(self, cls, split=False):
+        """Sol panel: adina tikla -> aktif bolmede (varsa mevcut olani goster); + -> yanina yeni."""
+        if not split:
+            for s in self.sessions:
+                if type(s) is cls:
+                    if self.ws.active is not None and self.ws.active.session is s:
+                        return s
+                    self.ws.show_session(s)
+                    return s
+            s = self.create_session(cls)
+            self.ws.show_session(s)
+            return s
+        s = self.create_session(cls)
+        tgt = self.ws.active or self.ws.panes()[0]
+        if tgt.session is None:
+            tgt.set_session(s)
+            self.ws.set_active(tgt)
+        else:
+            self.ws.split_pane(tgt, None, s)
+        self.workspace_changed()
+        return s
+
+    def add_session(self, cls, focus=True):
+        return self.open_tool(cls, split=True)
+
+    def confirm_close(self, s):
+        if s.transport is not None or getattr(s, 'is_busy', lambda: False)():
+            r = W.QMessageBox.question(self, 'Kapat', f'{s.tab_label()}: baglanti / test calisiyor. Kapatilsin mi?')
+            return r == qenum(W.QMessageBox, 'StandardButton.Yes')
+        return True
+
+    def destroy_session(self, s):
+        try:
+            s.store_settings()
+        except Exception:
+            pass
+        s.shutdown()
+        if s in self.sessions:
+            self.sessions.remove(s)
+        s.setParent(None)
+        s.deleteLater()
+        self.workspace_changed()
+
+    def close_session(self, s):
+        p = self.ws.pane_of(s)
+        if p is not None:
+            self.ws.close_pane(p)
+        elif self.confirm_close(s):
+            self.destroy_session(s)
 
     def session_state_changed(self, s):
-        idx = self.tabs.indexOf(s)
-        if idx < 0:
+        ws = getattr(self, 'ws', None)
+        if ws is None:
             return
-        self.tabs.setTabText(idx, ('● ' if s.connected else '') + s.tab_label())
-        self.tabs.tabBar().setTabTextColor(idx, QtGui.QColor('#2da44e') if s.connected
-                                           else self.palette().color(qenum(QtGui.QPalette, 'ColorRole.WindowText')))
+        p = ws.pane_of(s)
+        if p is not None:
+            p.refresh_title()
+        self.workspace_changed()
 
     # -- ag araclari arasi baglantilar
     def ifaces_changed(self, ifaces):
         self.ifaces = ifaces
-        for i in range(self.tabs.count()):
-            w = self.tabs.widget(i)
+        for w in self.sessions:
             if isinstance(w, ScanTab):
                 w.ifaces_changed(ifaces)
 
     def _first(self, cls):
-        for i in range(self.tabs.count()):
-            if isinstance(self.tabs.widget(i), cls):
-                self.tabs.setCurrentIndex(i)
-                return self.tabs.widget(i)
-        return self.add_session(cls)
+        for s in self.sessions:
+            if isinstance(s, cls):
+                if self.ws.pane_of(s) is None:
+                    self.ws.show_session(s, split=True)
+                else:
+                    self.ws.show_session(s)
+                return s
+        return self.open_tool(cls, split=True)
 
     def send_to_ping(self, ip):
         self._first(PingTab).add_host(ip)
@@ -2647,8 +3871,7 @@ class MainWindow(W.QMainWindow):
 
     def _admin_changed(self):
         self.lbl_admin.setText(self.admin_state()[1] + '  ')
-        for i in range(self.tabs.count()):
-            w = self.tabs.widget(i)
+        for w in self.sessions:
             if isinstance(w, NetConfigTab):
                 w.update_admin_label()
 
@@ -2676,11 +3899,43 @@ class MainWindow(W.QMainWindow):
         _bg(self, h.start, done)
 
     def about(self):
-        W.QMessageBox.about(
-            self, f'{APP_NAME} {APP_VERSION}',
-            f'<b>{APP_NAME} {APP_VERSION}</b><br>Seri port / TCP / UDP hizli test ve izleme araci.<br><br>'
-            f'Python {sys.version.split()[0]} &nbsp; Qt arayuz: {QT_API} &nbsp; pyserial {serial.VERSION}<br>'
-            f'Ayarlar: {self.settings.fileName()}')
+        qexec(AboutDialog(self))
+
+    def set_language(self, code):
+        self.settings.setValue('lang', code)
+        r = W.QMessageBox.question(self, tr('Language'), tr('Restart BYSTerm to apply the new language.') + '\n\n' +
+                                   tr('Restart now?'))
+        if r == qenum(W.QMessageBox, 'StandardButton.Yes'):
+            self.restart()
+
+    def set_theme(self, code):
+        self.settings.setValue('theme', code)
+        apply_theme(W.QApplication.instance(), code != 'light')
+
+    def restart(self):
+        cmd = net._self_cmd() + [a for a in sys.argv[1:] if a not in ('--elevated', '--updated')]
+        if net.is_admin() and net.IS_WIN:
+            cmd.append('--elevated')
+        self.close()
+        subprocess.Popen(cmd, close_fds=True)
+        W.QApplication.instance().quit()
+
+    def check_updates(self, manual=False):
+        def done(rel, err):
+            if err or not rel:
+                if manual:
+                    W.QMessageBox.warning(self, APP_NAME, tr('Could not check for updates: {err}').format(err=err))
+                return
+            newer = upd.parse_version(rel['version']) > upd.parse_version(APP_VERSION)
+            if not newer:
+                if manual:
+                    W.QMessageBox.information(self, APP_NAME, tr('You are using the latest version ({cur}).').format(
+                        cur=f'v{APP_VERSION}'))
+                return
+            if not manual and str(self.settings.value('skip_version', '')) == rel['version']:
+                return
+            qexec(UpdateDialog(self, rel))
+        _bg(self, upd.latest_release, done)
 
     def closeEvent(self, ev):
         if net.PrivHelper.instance is not None:
@@ -2689,8 +3944,11 @@ class MainWindow(W.QMainWindow):
         self._scan_now.set()
         self.settings.setValue('geometry', self.saveGeometry())
         self.settings.setValue('last_dir', self.last_dir)
-        for i in range(self.tabs.count()):
-            w = self.tabs.widget(i)
+        try:
+            self.settings.setValue('layout', json.dumps(self.ws.dump()))
+        except Exception:
+            pass
+        for w in list(self.sessions):
             try:
                 w.store_settings()
             except Exception:
@@ -2737,25 +3995,55 @@ def main():
     app = W.QApplication(sys.argv)
     _st('QApplication hazir')
     selftest = '--selftest' in sys.argv
-    ask_admin = str(QtCore.QSettings(APP_NAME, APP_NAME).value('ask_admin', 'true')).lower() in ('1', 'true')
+    cfg = QtCore.QSettings(APP_NAME, APP_NAME)
+    on = lambda k, d='true': str(cfg.value(k, d)).lower() in ('1', 'true')   # noqa: E731
+    set_lang(str(cfg.value('lang', 'en')))
+    ask_admin = on('ask_admin')
     if (core.IS_WIN and ask_admin and not selftest and not net.is_admin()
             and '--elevated' not in sys.argv):
         # acilista BIR KEZ UAC: onaylanirsa yonetici olarak yeniden baslar, reddedilirse normal devam
         if net.relaunch_as_admin():
             sys.exit(0)
     app.setApplicationName(APP_NAME)
-    app.setStyle('Fusion')
+    if hasattr(app, 'setDesktopFileName'):
+        app.setDesktopFileName('bysterm')
+    apply_theme(app, str(cfg.value('theme', 'dark')) != 'light')
     icon = resource('icon.png')
     if os.path.exists(icon):
         app.setWindowIcon(QtGui.QIcon(icon))
+    upd.cleanup_old()
+    upd.linux_desktop_integration(icon)      # Linux: uygulama menusune simgesiyle ekle
     win = MainWindow()
     _st('ana pencere olustu')
-    win.show()
-    win._admin_changed()
-    if selftest:
-        QtCore.QTimer.singleShot(300, lambda: _selftest(win))
-    elif ask_admin and not core.IS_WIN and not net.is_admin():
-        QtCore.QTimer.singleShot(400, win.request_admin)
+
+    def show_main():
+        win.setWindowOpacity(0.0)
+        win.show()
+        win._admin_changed()
+        fade = QtCore.QVariantAnimation(win) if hasattr(QtCore, 'QVariantAnimation') else None
+        if fade is not None:
+            fade.setStartValue(0.0)
+            fade.setEndValue(1.0)
+            fade.setDuration(320)
+            fade.valueChanged.connect(lambda v: win.setWindowOpacity(float(v)))
+            fade.start()
+            win._fade = fade
+        else:
+            win.setWindowOpacity(1.0)
+        if selftest:
+            win.setWindowOpacity(1.0)
+            QtCore.QTimer.singleShot(300, lambda: _selftest(win))
+            return
+        if ask_admin and not core.IS_WIN and not net.is_admin():
+            QtCore.QTimer.singleShot(400, win.request_admin)
+        if on('check_updates') and upd.is_frozen():
+            QtCore.QTimer.singleShot(2500, lambda: win.check_updates(manual=False))
+    if on('splash') and not selftest:
+        sp = Splash(show_main)
+        sp.show()
+        win._splash = sp
+    else:
+        show_main()
     sys.exit(qexec(app))
 
 
