@@ -3382,6 +3382,87 @@ def _icon(kind, color='#c9d1d9', size=16):
     return QtGui.QIcon(pm)
 
 
+def _gpos(ev):
+    """Qt5/Qt6: fare olayinin ekran konumu (QPoint)."""
+    if hasattr(ev, 'globalPosition'):
+        return ev.globalPosition().toPoint()
+    return ev.globalPos()
+
+
+class PaneHeader(W.QWidget):
+    """Bolme basligi: tutup surukleyince bolme tasinir (Qt surukle-birak sistemi KULLANILMAZ;
+    fare dogrudan izlenir — etiketler fare olayini yutmaz, her platformda ayni calisir)."""
+
+    def __init__(self, pane):
+        super().__init__()
+        self.pane = pane
+        self._press = None
+        self._dragging = False
+        self.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.OpenHandCursor')))
+
+    def mousePressEvent(self, ev):
+        if ev.button() == qenum(Qt, 'MouseButton.LeftButton'):
+            self._press = _gpos(ev)
+            self._dragging = False
+            self.pane.ws.set_active(self.pane)
+            ev.accept()
+        else:
+            super().mousePressEvent(ev)
+
+    def mouseMoveEvent(self, ev):
+        if self._press is None:
+            return
+        g = _gpos(ev)
+        if not self._dragging and (g - self._press).manhattanLength() > 10:
+            if len(self.pane.ws.panes()) < 2:
+                return
+            self._dragging = True
+            self.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.ClosedHandCursor')))
+            self.pane.ws.begin_drag(self.pane)
+        if self._dragging:
+            self.pane.ws.drag_move(g)
+        ev.accept()
+
+    def mouseReleaseEvent(self, ev):
+        if self._dragging:
+            self.pane.ws.end_drag(_gpos(ev))
+        self._press = None
+        self._dragging = False
+        self.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.OpenHandCursor')))
+        ev.accept()
+
+
+class DropOverlay(W.QWidget):
+    """Surukleme sirasinda hedef bolmede 'buraya duser' alanini gosteren yari saydam katman
+    (her seyin ustunde; fareyi engellemez)."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setAttribute(qenum(Qt, 'WidgetAttribute.WA_TransparentForMouseEvents'))
+        self.label = ''
+        self.hide()
+
+    def paintEvent(self, ev):
+        p = QtGui.QPainter(self)
+        p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+        r = QtCore.QRectF(self.rect()).adjusted(2, 2, -2, -2)
+        col = QtGui.QColor(ACC)
+        col.setAlpha(70)
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(r, 8, 8)
+        p.fillPath(path, col)
+        p.setPen(QtGui.QPen(QtGui.QColor(ACC), 2.5))
+        p.drawPath(path)
+        if self.label:
+            f = p.font()
+            f.setPointSize(f.pointSize() + 3)
+            f.setBold(True)
+            p.setFont(f)
+            p.setPen(QtGui.QColor('#ffffff'))
+            p.drawText(r, qenum(Qt, 'AlignmentFlag.AlignCenter'), self.label)
+        p.end()
+
+
 class Pane(W.QFrame):
     """Tek bir oturumu (Seri, TCP, Ping...) tutan bolme: baslik cubugu + icerik."""
 
@@ -3389,23 +3470,20 @@ class Pane(W.QFrame):
         super().__init__()
         self.ws = ws
         self.session = None
-        self._drop_zone = None
         self.setObjectName('pane')
-        self.setAcceptDrops(True)
         lay = W.QVBoxLayout(self)
         lay.setContentsMargins(1, 1, 1, 1)
         lay.setSpacing(0)
-        self.header = W.QWidget()
+        self.header = PaneHeader(self)
         self.header.setObjectName('paneHeader')
-        self.header.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.OpenHandCursor')))
-        self.header.installEventFilter(self)
-        self._press_pos = None
+        self.header.setAttribute(qenum(Qt, 'WidgetAttribute.WA_StyledBackground'))
         hl = W.QHBoxLayout(self.header)
         hl.setContentsMargins(8, 2, 4, 2)
         hl.setSpacing(2)
         self.title = W.QLabel('')
         self.title.setObjectName('paneTitle')
-        self.title.setToolTip('Başlığı tutup sürükleyerek bölmeyi taşıyın')
+        self.title.setToolTip('Başlığı tutup sürükleyerek pencereyi taşıyın')
+        self.title.setAttribute(qenum(Qt, 'WidgetAttribute.WA_TransparentForMouseEvents'))
         hl.addWidget(self.title, 1)
         self.btns = {}
         for key, tip, fn in (('hsplit', 'Yana bol  (Ctrl+Shift+E)', lambda: ws.split_pane(self, 'h')),
@@ -3475,96 +3553,19 @@ class Pane(W.QFrame):
             '#paneTitle { color: %s; }' % (
                 (ACC, on_hdr, on_tx) if on else (off_bd, off_hdr, off_tx)))
 
-    # -- surukle-birak ile bolme tasima
-    MIME = 'application/x-bysterm-pane'
-
-    def eventFilter(self, obj, ev):
-        if obj is self.header:
-            et = ev.type()
-            if et == qenum(QtCore.QEvent, 'Type.MouseButtonPress') and ev.button() == qenum(Qt, 'MouseButton.LeftButton'):
-                self._press_pos = ev.pos()
-                self.ws.set_active(self)
-            elif et == qenum(QtCore.QEvent, 'Type.MouseMove') and self._press_pos is not None:
-                if (ev.pos() - self._press_pos).manhattanLength() > 8:
-                    self._start_drag()
-                    self._press_pos = None
-            elif et == qenum(QtCore.QEvent, 'Type.MouseButtonRelease'):
-                self._press_pos = None
-        return False
-
-    def _start_drag(self):
-        if len(self.ws.panes()) < 2:
-            return
-        drag = QtGui.QDrag(self)
-        mime = QtCore.QMimeData()
-        mime.setData(self.MIME, b'1')
-        drag.setMimeData(mime)
-        pm = self.header.grab()
-        drag.setPixmap(pm)
-        drag.setHotSpot(QtCore.QPoint(20, pm.height() // 2))
-        Workspace.drag_src = self
-        self.header.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.ClosedHandCursor')))
-        drag.exec(qenum(Qt, 'DropAction.MoveAction')) if hasattr(drag, 'exec') else drag.exec_(qenum(Qt, 'DropAction.MoveAction'))
-        self.header.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.OpenHandCursor')))
-
+    # -- surukle-birak: hedef bolge
     def _zone_at(self, pos):
-        w, h = self.width(), self.height()
+        w, h = max(1, self.width()), max(1, self.height())
         x, y = pos.x(), pos.y()
-        # kenara olan goreli uzakliklar; en yakin kenar bolgeyi belirler, merkez genis birakilir
         dl, dr, dt, db = x / w, (w - x) / w, y / h, (h - y) / h
         m = min(dl, dr, dt, db)
-        if m > 0.5:
-            return 'center'
-        return {dl: 'left', dr: 'right', dt: 'top', db: 'bottom'}[m]
+        return [z for z, d in (('left', dl), ('right', dr), ('top', dt), ('bottom', db)) if d == m][0]
 
-    def dragEnterEvent(self, ev):
-        if ev.mimeData().hasFormat(self.MIME) and getattr(Workspace, 'drag_src', None) is not None:
-            ev.acceptProposedAction()
-
-    def dragMoveEvent(self, ev):
-        z = self._zone_at(ev.pos())
-        if z != self._drop_zone:
-            self._drop_zone = z
-            self.update()
-        ev.acceptProposedAction()
-
-    def dragLeaveEvent(self, ev):
-        self._drop_zone = None
-        self.update()
-
-    def dropEvent(self, ev):
-        z = self._drop_zone or self._zone_at(ev.pos())
-        self._drop_zone = None
-        self.update()
-        src = getattr(Workspace, 'drag_src', None)
-        Workspace.drag_src = None
-        if src is not None and src is not self:
-            self.ws.move_pane(src, self, z)
-        ev.acceptProposedAction()
-
-    def paintEvent(self, ev):
-        super().paintEvent(ev)
-        if not self._drop_zone:
-            return
-        p = QtGui.QPainter(self)
-        p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
-        r = QtCore.QRectF(self.rect())
-        z = self._drop_zone
-        if z == 'left':
-            r.setWidth(r.width() / 2)
-        elif z == 'right':
-            r.setLeft(r.center().x())
-        elif z == 'top':
-            r.setHeight(r.height() / 2)
-        elif z == 'bottom':
-            r.setTop(r.center().y())
-        col = QtGui.QColor(ACC)
-        col.setAlpha(60)
-        p.fillRect(r, col)
-        pen = QtGui.QPen(QtGui.QColor(ACC), 2)
-        p.setPen(pen)
-        p.drawRect(r.adjusted(1, 1, -1, -1))
-        p.end()
+    def zone_rect(self, zone):
+        r = self.rect()
+        w, h = r.width(), r.height()
+        return {'left': QtCore.QRect(0, 0, w // 2, h), 'right': QtCore.QRect(w // 2, 0, w - w // 2, h),
+                'top': QtCore.QRect(0, 0, w, h // 2), 'bottom': QtCore.QRect(0, h // 2, w, h - h // 2)}[zone]
 
 
 class Workspace(W.QWidget):
@@ -3582,6 +3583,9 @@ class Workspace(W.QWidget):
         self.zoomed = None
         self._set_root(Pane(self))
         self.set_active(self.root)
+        self.overlay = DropOverlay(self)
+        self._drag_src = None
+        self._drag_tgt = None
 
     # -- agac yardimcilari
     def _set_root(self, w):
@@ -3663,6 +3667,43 @@ class Workspace(W.QWidget):
         new.show()
         self.set_active(new)
         return new
+
+    # -- fareyle tasima (PaneHeader cagirir)
+    def begin_drag(self, pane):
+        if self.zoomed is not None:
+            self.toggle_zoom(self.zoomed)
+        self._drag_src = pane
+        self._drag_tgt = None
+
+    def _pane_at(self, gpos):
+        # geometriyle bul (widgetAt bazi platformlarda/ustte pencere varken guvenilmez)
+        for p in self.panes():
+            if p.isVisible() and p.rect().contains(p.mapFromGlobal(gpos)):
+                return p
+        return None
+
+    def drag_move(self, gpos):
+        tgt = self._pane_at(gpos)
+        if tgt is None or tgt is self._drag_src:
+            self._drag_tgt = None
+            self.overlay.hide()
+            return
+        zone = tgt._zone_at(tgt.mapFromGlobal(gpos))
+        self._drag_tgt = (tgt, zone)
+        zr = tgt.zone_rect(zone)
+        top_left = tgt.mapTo(self, zr.topLeft())
+        self.overlay.setGeometry(QtCore.QRect(top_left, zr.size()))
+        self.overlay.label = {'left': '◀ Sola', 'right': 'Sağa ▶', 'top': '▲ Üste', 'bottom': '▼ Alta'}[zone]
+        self.overlay.show()
+        self.overlay.raise_()
+        self.overlay.update()
+
+    def end_drag(self, gpos):
+        self.overlay.hide()
+        src, tgt = self._drag_src, self._drag_tgt
+        self._drag_src = self._drag_tgt = None
+        if src is not None and tgt is not None:
+            self.move_pane(src, tgt[0], tgt[1])
 
     def _detach_pane(self, pane):
         """Bolmeyi agactan cikar (oturumu YOK ETMEDEN). Agaci sadelestirir."""
@@ -3869,7 +3910,7 @@ class Sidebar(W.QWidget):
                 b.setObjectName('tool')
                 b.setIcon(tool_icon(cls.KIND))
                 b.setIconSize(QtCore.QSize(18, 18))
-                b.setToolTip(f'{cls.TITLE}: aktif bolmede ac (varsa mevcut olana gec)')
+                b.setToolTip(f'{cls.TITLE}: seçili pencerenin içeriğini buna çevir')
                 b.clicked.connect(lambda _=False, c=cls: main.open_tool(c, split=False))
                 plus = W.QToolButton()
                 plus.setIcon(_icon('plus', ACC))
@@ -3880,7 +3921,7 @@ class Sidebar(W.QWidget):
                 row.addWidget(plus)
                 lay.addLayout(row)
         lay.addStretch(1)
-        hint = W.QLabel('Araç adı: boş/aktif bölmede aç\n+ : yanına yeni bölme\n\n'
+        hint = W.QLabel('Araç adı: seçili pencerede aç\n+ : yanına yeni pencere ekle\n\n'
                         'Ctrl+Shift+E yana böl · O alta böl\nX tam ekran · W kapat · Ctrl+Tab geç')
         hint.setStyleSheet('color:#777; font-size: 10px;')
         lay.addWidget(hint)
@@ -4070,21 +4111,23 @@ class MainWindow(W.QMainWindow):
         return s
 
     def open_tool(self, cls, split=False):
-        """Araç adına tıkla (split=False): o araç açıksa ona geç, değilse boş bölmede aç,
-        bölme doluysa yanına böl (hiçbir pencere gizlenmez). + (split=True): her zaman yanına böl."""
+        """Araç adına tıkla (split=False): AKTİF (en son seçilen) pencerenin içeriği o araçla
+        değişir — yeni pencere açılmaz. + (split=True): aktif pencerenin yanına yeni pencere ekler."""
         if not split:
-            for s in self.sessions:            # zaten açıksa ona geç
-                if type(s) is cls and self.ws.pane_of(s) is not None:
-                    self.ws.set_active(self.ws.pane_of(s))
-                    return s
             tgt = self.ws.active or self.ws.panes()[0]
-            if tgt.session is None:            # boş bölme varsa oraya
-                s = self.create_session(cls)
-                tgt.set_session(s)
+            old = tgt.session
+            if old is not None and type(old) is cls:
                 self.ws.set_active(tgt)
-                self.workspace_changed()
-                return s
-            # dolu: yanına böl
+                return old
+            if old is not None and not self.confirm_close(old):
+                return old
+            s = self.create_session(cls)
+            tgt.set_session(s)                 # eskisi holder'a gider -> kapat
+            if old is not None:
+                self.destroy_session(old)
+            self.ws.set_active(tgt)
+            self.workspace_changed()
+            return s
         s = self.create_session(cls)
         tgt = self.ws.active or self.ws.panes()[0]
         if tgt.session is None:
