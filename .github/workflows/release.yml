@@ -1,0 +1,106 @@
+name: Build & Release
+
+# v* etiketi push'lanınca (ör. git tag v1.0.0 && git push origin v1.0.0) tüm platformlar
+# derlenir, her biri kendi selftest'inden geçer ve GitHub Releases'a yüklenir.
+# Actions sekmesinden "Run workflow" ile elle de çalıştırılabilir (sadece artifact üretir).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64,   runner: ubuntu-latest }
+          - { arch: arm64, runner: ubuntu-24.04-arm }   # Jetson
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build in Ubuntu 18.04 (glibc 2.27 -> runs on 18.04+ and all JetPacks)
+        run: docker run --rm -v "$PWD":/src -w /src ubuntu:18.04 bash ci/build_linux_docker.sh
+      - name: Selftest on Ubuntu 18.04 / 20.04 / 22.04 / 24.04
+        run: |
+          mkdir -p /tmp/t && tar -C /tmp/t -xzf release/BYSTerm-linux-${{ matrix.arch }}.tar.gz
+          for img in ubuntu:18.04 ubuntu:20.04 ubuntu:22.04 ubuntu:24.04; do
+            docker run --rm -v /tmp/t/BYSTerm:/app -v "$PWD/ci":/ci $img bash /ci/selftest_linux.sh
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: release/*
+
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.8', architecture: x64 }   # 3.8 = Windows 7/8.1 desteği
+      - run: python -m pip install pyserial==3.5 PyQt5==5.15.10 PyQt5-Qt5==5.15.2 PyQt5-sip pyinstaller==5.13.2
+      - run: python ci/build.py
+      - name: Selftest
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath release\BYSTerm-windows-x64.exe -ArgumentList '--selftest' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "selftest failed: $($p.ExitCode)" }
+          "selftest OK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: release/*
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: arm64, runner: macos-14 }        # Apple Silicon (M1..M4)
+          - { arch: x64,   runner: macos-15-intel }  # Intel Mac
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: python -m pip install pyserial==3.5 PyQt5==5.15.11 pyinstaller==6.11.1
+      - run: python ci/build.py
+      - name: Selftest
+        run: dist/BYSTerm.app/Contents/MacOS/BYSTerm --selftest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: release/*
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - run: ls -la release
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          body: |
+            ## İndir
+            | Sistem | Dosya |
+            |---|---|
+            | Windows 10/11 (64-bit) | `BYSTerm-windows-x64.exe` — çift tıkla |
+            | macOS Apple Silicon (M1–M4) | `BYSTerm-macos-arm64.zip` |
+            | macOS Intel | `BYSTerm-macos-x64.zip` |
+            | Linux PC (Ubuntu 18.04+) | `BYSTerm-linux-x64.tar.gz` |
+            | NVIDIA Jetson (JetPack 4 / 5 / 6), Raspberry Pi 64-bit | `BYSTerm-linux-arm64.tar.gz` |
+
+            Kurulum gerekmez. Ayrıntılar: README.
