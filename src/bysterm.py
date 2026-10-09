@@ -4457,7 +4457,24 @@ def _st(msg):
         print(f'{APP_NAME} selftest: {msg}', flush=True)
 
 
+def _safe_stdio():
+    # LANG=C olan sistemlerde (ör. Jetson/Ubuntu 18.04 servis/SSH) Python 3.6 konsolu ASCII'dir:
+    # Turkce karakter iceren bir print uygulamayi cokertmesin.
+    import io
+    for name in ('stdout', 'stderr'):
+        s = getattr(sys, name, None)
+        enc = (getattr(s, 'encoding', None) or '').lower().replace('-', '').replace('_', '')
+        if s is None or enc == 'utf8' or not hasattr(s, 'buffer'):
+            continue
+        try:
+            setattr(sys, name, io.TextIOWrapper(s.buffer, encoding=getattr(s, 'encoding', None) or 'ascii',
+                                                errors='backslashreplace', line_buffering=True))
+        except Exception:
+            pass
+
+
 def main():
+    _safe_stdio()
     if '--selftest' in sys.argv:
         # en bastan bekci: baslangicta (Qt/pencere/port tarama) takilsa bile surec biter
         def _early():
