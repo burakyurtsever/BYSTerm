@@ -83,7 +83,7 @@ from bysterm_i18n import tr, set_lang, LANGS   # noqa: E402
 from bysterm_core import RX, TX  # noqa: E402
 
 APP_NAME = 'BYSTerm'
-APP_VERSION = '1.1.0'
+APP_VERSION = '1.2.0'
 
 Qt = QtCore.Qt
 W = QtWidgets
@@ -1456,6 +1456,21 @@ class MonitorSession(Session):
         self.chk_passive = W.QCheckBox()      # geriye uyum (make_transport kullanir)
         self.chk_passive.setVisible(False)
 
+        # Windows: com0com sanal port surucusu kur / cift olustur
+        self.c0c_row = W.QWidget()
+        cc = FlowLayout(self.c0c_row)
+        self.btn_c0c = W.QPushButton('Sanal port surucusu kur (com0com)')
+        self.btn_c0c.clicked.connect(self._c0c_install)
+        self.btn_c0c_pair = W.QPushButton('Yeni sanal port cifti olustur')
+        self.btn_c0c_pair.clicked.connect(self._c0c_pair)
+        self.lbl_c0c = W.QLabel('')
+        self.lbl_c0c.setStyleSheet('color:#8b929c')
+        cc.addWidget(self.btn_c0c)
+        cc.addWidget(self.btn_c0c_pair)
+        cc.addWidget(self.lbl_c0c, 1)
+        col.addWidget(self.c0c_row)
+        self.c0c_row.setVisible(core.IS_WIN)
+
         self.help = W.QLabel()
         self.help.setWordWrap(True)
         self.help.setStyleSheet('color:#888')
@@ -1495,6 +1510,10 @@ class MonitorSession(Session):
             self.lbl_v.setText('Sanal port')
             self.chk_follow.setVisible(core.IS_POSIX)
             self._passive_toggled(False)
+        if hasattr(self, 'c0c_row'):
+            self.c0c_row.setVisible(core.IS_WIN and mode == 'bridge')
+            if core.IS_WIN and mode == 'bridge':
+                self._c0c_refresh()
 
     def _fill_procs(self):
         if not core.IS_LINUX or self.proc.view().isVisible():
@@ -1530,6 +1549,44 @@ class MonitorSession(Session):
         self.virt.blockSignals(False)
         if not core.IS_POSIX:
             self.virt.lineEdit().setPlaceholderText('ornek: COM11 (com0com ciftinin BIR ucu)')
+
+    def _c0c_refresh(self):
+        if not core.IS_WIN:
+            return
+        pairs = net.com0com_pairs()
+        if net.com0com_setupc():
+            self.btn_c0c.setText('com0com kurulu ✓ (yeniden kur)')
+            txt = ('Ciftler: ' + ', '.join(f'{a}↔{b}' for a, b in pairs)) if pairs else 'Henuz cift yok — olusturun.'
+            self.lbl_c0c.setText(txt)
+            self.btn_c0c_pair.setEnabled(True)
+        else:
+            self.btn_c0c.setText('Sanal port surucusu kur (com0com)')
+            self.lbl_c0c.setText('Seri izleme icin bir kez kurulur (ucretsiz).')
+            self.btn_c0c_pair.setEnabled(False)
+
+    def _c0c_install(self):
+        self.btn_c0c.setEnabled(False)
+        self.lbl_c0c.setText('com0com indiriliyor/kuruluyor...')
+        _bg(self, lambda: net.com0com_install(log=lambda m: None), self._c0c_done)
+
+    def _c0c_done(self, res, err):
+        self.btn_c0c.setEnabled(True)
+        ok, msg = res if res else (False, str(err))
+        self.lbl_c0c.setText(msg)
+        if not ok and ('ZIP degil' in msg or 'erisil' in msg.lower()):
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(net.COM0COM_PAGE))
+        self._c0c_refresh()
+        self._fill_virt(self.main.ports)
+
+    def _c0c_pair(self):
+        self.btn_c0c_pair.setEnabled(False)
+        _bg(self, net.com0com_create_pair, self._c0c_paired)
+
+    def _c0c_paired(self, res, err):
+        self.btn_c0c_pair.setEnabled(True)
+        ok, msg = res if res else (False, str(err))
+        self.lbl_c0c.setText(msg)
+        QtCore.QTimer.singleShot(1500, self._c0c_refresh)
 
     def _passive_toggled(self, on):
         self.lbl_v.setText('Ikinci port (B)' if on else 'Sanal port')

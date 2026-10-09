@@ -1965,3 +1965,141 @@ def relaunch_as_admin(extra_args=('--elevated',)):
     args = cmd[1:] + [a for a in sys.argv[1:] if a not in extra_args] + list(extra_args)
     r = ctypes.windll.shell32.ShellExecuteW(None, 'runas', cmd[0], subprocess.list2cmdline(args), None, 1)
     return int(r) > 32
+
+
+# =========================================================================== Windows: com0com sanal port surucusu
+# Seri izleme (sanal port koprusu) icin ucretsiz/imzali com0com. BYSTerm, com0com'u kullanicinin
+# PC'sinde indirip kurabilir ve bir sanal port cifti olusturabilir (SourceForge kullanicinin aginda erisilir).
+COM0COM_PAGE = 'https://com0com.sourceforge.net/'
+COM0COM_ZIP = ('https://sourceforge.net/projects/com0com/files/com0com/3.0.0.0/'
+               'com0com-3.0.0.0-i386-and-x64-signed.zip/download')
+
+
+def com0com_setupc():
+    """Kurulu com0com'un setupc.exe yolu (yoksa None)."""
+    if not IS_WIN:
+        return None
+    for env in ('ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432'):
+        base = os.environ.get(env)
+        if base:
+            p = os.path.join(base, 'com0com', 'setupc.exe')
+            if os.path.isfile(p):
+                return p
+    return None
+
+
+def com0com_pairs():
+    """Mevcut sanal port ciftleri -> [(portA, portB), ...]. com0com yoksa []."""
+    sc = com0com_setupc()
+    if not sc:
+        return []
+    rc, out = run([sc, 'list'], timeout=20)
+    if rc != 0:
+        return []
+    # cikti: "CNCA0 PortName=COM5" / "CNCB0 PortName=COM6" ... ciftler numaraya gore eslesir
+    a, b = {}, {}
+    for line in out.splitlines():
+        m = re.match(r'\s*CNC([AB])(\d+)\s+PortName=(\S+)', line)
+        if m:
+            name = m.group(3)
+            if name == '-':
+                name = f'CNC{m.group(1)}{m.group(2)}'
+            (a if m.group(1) == 'A' else b)[m.group(2)] = name
+    return [(a[k], b[k]) for k in sorted(a) if k in b]
+
+
+def com0com_create_pair():
+    """Yeni bir sanal port cifti olustur -> (basarili, metin). Yonetici gerekir."""
+    sc = com0com_setupc()
+    if not sc:
+        return False, 'com0com kurulu degil'
+    cmd = [sc, 'install', 'PortName=COM#', 'PortName=COM#']
+    if is_admin():
+        rc, out = run(cmd, timeout=60)
+        return rc == 0, out
+    # UAC ile setupc.exe'yi yonetici calistir
+    import ctypes
+    params = subprocess.list2cmdline(cmd[1:])
+    r = ctypes.windll.shell32.ShellExecuteW(None, 'runas', sc, params, os.path.dirname(sc), 0)
+    if int(r) <= 32:
+        return False, 'Iptal edildi veya yetki verilmedi'
+    time.sleep(2.0)
+    return True, 'cift olusturuldu (liste yenilenince gorunur)'
+
+
+def com0com_install(progress=None, log=None):
+    """com0com'u indir ve sessizce kur (UAC). -> (basarili, metin). Yalniz Windows."""
+    if not IS_WIN:
+        return False, 'Yalniz Windows'
+    import tempfile
+    import zipfile
+    import urllib.request
+    import ssl
+    def say(m):
+        if log:
+            log(m)
+    try:
+        ctx = ssl.create_default_context()
+        try:
+            import certifi
+            ctx.load_verify_locations(certifi.where())
+        except Exception:
+            pass
+        say('com0com indiriliyor...')
+        req = urllib.request.Request(COM0COM_ZIP, headers={'User-Agent': 'Mozilla/5.0'})
+        tmp = tempfile.mkdtemp(prefix='bysterm_c0c_')
+        zp = os.path.join(tmp, 'com0com.zip')
+        with urllib.request.urlopen(req, timeout=120, context=ctx) as r, open(zp, 'wb') as f:
+            total = int(r.headers.get('Content-Length') or 0)
+            done = 0
+            while True:
+                chunk = r.read(65536)
+                if not chunk:
+                    break
+                f.write(chunk)
+                done += len(chunk)
+                if progress:
+                    progress(done, total)
+        with open(zp, 'rb') as f:
+            if f.read(2) != b'PK':
+                return False, ('Indirme bir ZIP degil (SourceForge ara sayfasi gelmis olabilir). '
+                               'Lutfen com0com.sourceforge.net adresinden elle kurun.')
+        with zipfile.ZipFile(zp) as z:
+            z.extractall(tmp)
+        setup = None
+        for root_, _, files in os.walk(tmp):
+            if 'setup.exe' in files:
+                setup = os.path.join(root_, 'setup.exe')
+                break
+        if not setup:
+            return False, 'setup.exe bulunamadi'
+        say('Kurulum calisiyor (UAC onayi gerekebilir)...')
+        import ctypes
+        from ctypes import wintypes
+
+        class SEI(ctypes.Structure):
+            _fields_ = [('cbSize', wintypes.DWORD), ('fMask', ctypes.c_ulong), ('hwnd', wintypes.HWND),
+                        ('lpVerb', wintypes.LPCWSTR), ('lpFile', wintypes.LPCWSTR),
+                        ('lpParameters', wintypes.LPCWSTR), ('lpDirectory', wintypes.LPCWSTR),
+                        ('nShow', ctypes.c_int), ('hInstApp', wintypes.HINSTANCE),
+                        ('lpIDList', ctypes.c_void_p), ('lpClass', wintypes.LPCWSTR),
+                        ('hkeyClass', wintypes.HKEY), ('dwHotKey', wintypes.DWORD),
+                        ('hIconOrMonitor', wintypes.HANDLE), ('hProcess', wintypes.HANDLE)]
+        sei = SEI()
+        sei.cbSize = ctypes.sizeof(sei)
+        sei.fMask = 0x00000040
+        sei.lpVerb = 'runas'
+        sei.lpFile = setup
+        sei.lpParameters = '/S'
+        sei.lpDirectory = os.path.dirname(setup)
+        sei.nShow = 1
+        if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
+            err = ctypes.GetLastError()
+            return (False, 'Iptal edildi (UAC)') if err == 1223 else (False, f'Kurulum baslatilamadi ({err})')
+        ctypes.windll.kernel32.WaitForSingleObject(sei.hProcess, 180000)
+        ctypes.windll.kernel32.CloseHandle(sei.hProcess)
+        if com0com_setupc():
+            return True, 'com0com kuruldu'
+        return True, 'Kurulum tamamlandi (yeniden tarayin)'
+    except Exception as e:     # noqa: BLE001
+        return False, f'Hata: {e}'

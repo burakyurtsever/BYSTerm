@@ -168,5 +168,8 @@ jobs:
             | Linux PC (Ubuntu 18.04+) | `BYSTerm-linux-x64.tar.gz` |
             | NVIDIA Jetson (JetPack 4 / 5 / 6), Raspberry Pi 64-bit | `BYSTerm-linux-arm64.tar.gz` |
 
-            Windows kurulumu, seri port izleme için sanal port sürücüsünü (com0com) de isteğe bağlı kurar.
-            Taşınabilir sürüm ve Linux/Mac paketleri kurulum gerektirmez. Ayrıntılar: README.
+            Taşınabilir sürüm ve Linux/Mac paketleri kurulum gerektirmez.
+
+            **Seri port izleme:** Linux/Jetson'da "Canlı dinleme" ile portu başka uygulama açmışken
+            trafiği sanal port olmadan görürsünüz. Windows'ta sanal port köprüsü için com0com (ücretsiz)
+            kullanılır; BYSTerm > Seri İzleme bunu kurmanız için yönlendirir. Ayrıntılar: README.
