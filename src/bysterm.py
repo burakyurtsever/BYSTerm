@@ -1478,12 +1478,22 @@ def main():
 def _selftest(win):
     """Paketlenmis uygulamanin bu sistemde calistigini dogrular (CI ve kullanici icin):
     pencere acilir, kendi icinde TCP sunucu <-> istemci veri alisverisi yapilir."""
+    step = {'n': 0}
+    names = ('sunucu aciliyor', 'istemci baglaniyor', 'veri bekleniyor')
+
+    def watchdog():   # olay dongusu kilitlense bile surec mutlaka biter
+        print(f'{APP_NAME} SELFTEST TIMEOUT (adim: {names[min(step["n"], 2)]})', flush=True)
+        os._exit(3)
+    wd = threading.Timer(30, watchdog)
+    wd.daemon = True
+    wd.start()
+    print(f'{APP_NAME} selftest: pencere acildi', flush=True)
     srv = win.add_session(TcpServerSession)
     cli = win.add_session(TcpClientSession)
     srv.port.setValue(0)
+    srv.bind.setCurrentText('127.0.0.1')
     srv.open_conn()
     t0 = time.monotonic()
-    step = {'n': 0}
 
     def poll():
         ok = False
@@ -1499,12 +1509,14 @@ def _selftest(win):
         if step['n'] == 2 and srv.rx_total >= 10:
             ok = True
         if ok or time.monotonic() - t0 > 10:
+            wd.cancel()
             ports = len(win.ports)
             print(f'{APP_NAME} {APP_VERSION} SELFTEST {"OK" if ok else "FAIL"} '
                   f'(Qt {QtCore.qVersion()} / {QT_API}, Python {sys.version.split()[0]}, '
                   f'{sys.platform}, seri port: {ports})', flush=True)
             win.close()
             W.QApplication.instance().exit(0 if ok else 1)
+            threading.Timer(5, lambda: os._exit(0 if ok else 1)).start()   # kapanis takilirsa
             return
         QtCore.QTimer.singleShot(50, poll)
     poll()
