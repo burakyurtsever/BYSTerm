@@ -114,6 +114,68 @@ class SerialPty(unittest.TestCase):
         t.close()
 
 
+import bysterm_net as net   # noqa: E402
+
+
+class NetTools(unittest.TestCase):
+    def test_masks_and_ranges(self):
+        self.assertEqual(net.parse_mask('24'), ('255.255.255.0', 24))
+        self.assertEqual(net.parse_mask('255.255.0.0'), ('255.255.0.0', 16))
+        with self.assertRaises(ValueError):
+            net.parse_mask('255.0.255.0')
+        self.assertEqual(len(net.parse_range('192.168.1.0/24')), 254)
+        self.assertEqual(net.parse_range('10.0.0.5-7'), ['10.0.0.5', '10.0.0.6', '10.0.0.7'])
+        self.assertEqual(net.subnet_of('192.168.10.77', 24), '192.168.10.0/24')
+
+    def test_plan_validation(self):
+        it = net.Iface('eth0')
+        with self.assertRaises(ValueError):
+            net.make_plan(it, 'static', '10.0.0.5', '24', '10.9.9.1')       # gw baska alt agda
+        with self.assertRaises(ValueError):
+            net.make_plan(it, 'static', '300.0.0.1', '24')
+
+    def test_helper_whitelist(self):
+        real_which = net.which
+        net.which = lambda n: '/usr/sbin/' + n
+        try:
+            for bad in (['rm', '-rf', '/'], ['ip', 'netns', 'exec', 'x', 'sh'], ['dhclient', '-sf', '/x', 'eth0'],
+                        ['chmod', 'a+rw', '/etc/shadow'], ['usermod', '-aG', 'sudo', 'x'], ['nmcli', 'general', 'reload']):
+                with self.assertRaises(ValueError):
+                    net._helper_validate(bad)
+            for good in (['ip', 'addr', 'add', '10.0.0.1/24', 'dev', 'eth0'], ['chmod', 'a+rw', '/dev/ttyUSB0'],
+                         ['nmcli', 'connection', 'up', 'Wired 1'], ['dhclient', '-r', 'eth0']):
+                net._helper_validate(good)
+        finally:
+            net.which = real_which
+
+    def test_ping_localhost(self):
+        p = net.Pinger()
+        if p.backend is None:
+            self.skipTest('ping yok')
+        self.assertTrue(p.ping('127.0.0.1', 2000).ok)
+        p.close()
+
+    def _iperf(self, **kw):
+        srv = net.IperfServer(0, bind='127.0.0.1', once=True)
+        srv.start()
+        c = net.IperfClient('127.0.0.1', srv.port, duration=1, **kw)
+        c.start()
+        self.assertTrue(wait(lambda: not c.running, 15))
+        res = [e[2] for e in list(c.events) if e[0] == 'result']
+        self.assertTrue(res, [e for e in c.events if e[0] == 'info'])
+        self.assertGreater(res[0]['recv_bytes'], 0)
+        srv.stop()
+
+    def test_iperf_tcp(self):
+        self._iperf()
+
+    def test_iperf_tcp_reverse_parallel(self):
+        self._iperf(reverse=True, parallel=3)
+
+    def test_iperf_udp(self):
+        self._iperf(udp=True, rate=20000000)
+
+
 if __name__ == '__main__':
     socket.setdefaulttimeout(5)
     unittest.main(verbosity=1)

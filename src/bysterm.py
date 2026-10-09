@@ -24,11 +24,18 @@ Kaynaktan  : pip install pyserial PySide6 ; python3 src/bysterm.py
 """
 import os
 import sys
+import json
 import time
 import socket
 import threading
+import collections
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+if '--net-helper' in sys.argv:          # yonetici yardimcisi (root): Qt/pyserial YUKLENMEZ
+    import bysterm_net
+    bysterm_net.helper_main(sys.argv[sys.argv.index('--net-helper') + 1:])
+    sys.exit(0)
 
 try:
     import serial  # noqa: F401
@@ -67,10 +74,11 @@ if QT_API is None:
     sys.exit(1)
 
 import bysterm_core as core   # noqa: E402
+import bysterm_net as net   # noqa: E402
 from bysterm_core import RX, TX  # noqa: E402
 
 APP_NAME = 'BYSTerm'
-APP_VERSION = '1.0.0'
+APP_VERSION = '1.1.0'
 
 Qt = QtCore.Qt
 W = QtWidgets
@@ -704,6 +712,39 @@ class Session(W.QWidget):
             self.chk_repeat.setChecked(False)
             t.close()
             self.set_connected(False)
+            self._maybe_fix_permission(t, closed[2])
+
+    def _maybe_fix_permission(self, t, reason):
+        """Linux/macOS: seri porta erisim reddedildiyse yonetici yardimcisiyla izin ver ve yeniden ac."""
+        cfg = getattr(t, 'cfg', None)
+        if net.IS_WIN or cfg is None or 'Erisim reddedildi' not in reason or getattr(self, '_perm_try', False):
+            return
+        dev = cfg.port
+        h = net.PrivHelper.get()
+        if not h.alive:
+            r = W.QMessageBox.question(self, 'Seri port izni',
+                                       f'{dev} portuna erisim izniniz yok.\n\nIzin verilsin mi? (yonetici sifresi bir kez sorulur; '
+                                       f'kullaniciniz kalici olarak "dialout" grubuna da eklenir)')
+            if r != qenum(W.QMessageBox, 'StandardButton.Yes'):
+                return
+        self._perm_try = True
+        self.info(f'{dev}: erisim izni veriliyor...')
+
+        def work():
+            if not h.alive and not h.start():
+                return False, f'yonetici izni alinamadi ({h.err})'
+            return h.grant_serial(dev)
+
+        def done(res, err):
+            self.main._admin_changed()
+            ok, out = res if res else (False, str(err))
+            if ok:
+                self.info(f'{dev}: izin verildi, port yeniden aciliyor. (Kalici izin: bir sonraki oturum acilisinda gecerli olur.)')
+                self.open_conn()
+            else:
+                self.info(f'{dev}: izin verilemedi: {out}', 'error')
+            QtCore.QTimer.singleShot(3000, lambda: setattr(self, '_perm_try', False))
+        _bg(self, work, done)
 
     def info(self, text, level='info'):
         self.term.write_segments(self.fmt.text_line(time.time(), level, text),
@@ -1324,7 +1365,1108 @@ class MonitorSession(Session):
             self.virt.setEditText(v)
 
 
+# =========================================================================== ag araclari
+class LineGraph(W.QWidget):
+    """Basit canli cizgi grafik (ping RTT / iperf hizi). None = kayip (kirmizi cizgi)."""
+
+    def __init__(self, unit='', color='#79c0ff', maxpts=120, fmt='{:.1f}', parent=None):
+        super().__init__(parent)
+        self.unit, self.color, self.fmt = unit, color, fmt
+        self.vals = collections.deque(maxlen=maxpts)
+        self.title = ''
+        self.setMinimumHeight(110)
+
+    def add(self, v):
+        self.vals.append(v)
+        self.update()
+
+    def clear(self):
+        self.vals.clear()
+        self.update()
+
+    def paintEvent(self, ev):
+        p = QtGui.QPainter(self)
+        p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+        r = self.rect()
+        p.fillRect(r, QtGui.QColor(COLORS['bg']))
+        L, T, R, B = 52, 18, r.width() - 8, r.height() - 8
+        vals = list(self.vals)
+        good = [v for v in vals if v is not None]
+        top = max(good) * 1.2 if good else 1.0
+        top = top or 1.0
+        p.setPen(QtGui.QPen(QtGui.QColor('#30363d'), 1))
+        f = p.font()
+        f.setPointSize(max(7, f.pointSize() - 2))
+        p.setFont(f)
+        for i in range(5):
+            y = T + (B - T) * i / 4.0
+            p.setPen(QtGui.QPen(QtGui.QColor('#30363d'), 1))
+            p.drawLine(QtCore.QPointF(L, y), QtCore.QPointF(R, y))
+            p.setPen(QtGui.QColor(COLORS['hdr']))
+            p.drawText(QtCore.QRectF(0, y - 8, L - 4, 16), qenum(Qt, 'AlignmentFlag.AlignRight') |
+                       qenum(Qt, 'AlignmentFlag.AlignVCenter'), self.fmt.format(top * (4 - i) / 4.0))
+        n = min(self.vals.maxlen, max(len(vals), 20))   # az noktayla da genis gorunsun
+        step = (R - L) / float(max(1, n - 1))
+        x0 = R - (len(vals) - 1) * step
+        pts = []
+        for i, v in enumerate(vals):
+            x = x0 + i * step
+            if v is None:
+                if len(pts) > 1:
+                    p.setPen(QtGui.QPen(QtGui.QColor(self.color), 2))
+                    p.drawPolyline(QtGui.QPolygonF(pts))
+                pts = []
+                p.setPen(QtGui.QPen(QtGui.QColor(COLORS['error']), 2))
+                p.drawLine(QtCore.QPointF(x, B), QtCore.QPointF(x, B - 10))
+                continue
+            pts.append(QtCore.QPointF(x, B - (B - T) * v / top))
+        if len(pts) > 1:
+            p.setPen(QtGui.QPen(QtGui.QColor(self.color), 2))
+            p.drawPolyline(QtGui.QPolygonF(pts))
+        elif len(pts) == 1:
+            p.setBrush(QtGui.QColor(self.color))
+            p.drawEllipse(pts[0], 2, 2)
+        p.setPen(QtGui.QColor(COLORS['fg']))
+        last = next((v for v in reversed(vals) if v is not None), None)
+        txt = self.title + ('   son: ' + self.fmt.format(last) + ' ' + self.unit if last is not None else '')
+        p.drawText(QtCore.QRectF(L, 1, R - L, 16), qenum(Qt, 'AlignmentFlag.AlignLeft'), txt)
+        p.end()
+
+
+def _bg(widget, fn, done):
+    """fn'i arka planda calistir, sonucu GUI thread'inde done(sonuc, hata) ile ver."""
+    box = {}
+
+    def work():
+        try:
+            box['r'] = fn()
+        except Exception as e:     # noqa: BLE001
+            box['e'] = e
+    th = threading.Thread(target=work, daemon=True)
+    th.start()
+    tm = QtCore.QTimer(widget)
+
+    def poll():
+        if not th.is_alive():
+            tm.stop()
+            tm.deleteLater()
+            done(box.get('r'), box.get('e'))
+    tm.timeout.connect(poll)
+    tm.start(80)
+
+
+def _ro_item(text, color=None, align_right=False):
+    it = W.QTableWidgetItem(str(text))
+    it.setFlags(qenum(Qt, 'ItemFlag.ItemIsSelectable') | qenum(Qt, 'ItemFlag.ItemIsEnabled'))
+    if color:
+        it.setForeground(QtGui.QBrush(QtGui.QColor(color)))
+    if align_right:
+        it.setTextAlignment(qenum(Qt, 'AlignmentFlag.AlignRight') | qenum(Qt, 'AlignmentFlag.AlignVCenter'))
+    return it
+
+
+def _setup_table(tbl, headers, stretch_col=None):
+    tbl.setColumnCount(len(headers))
+    tbl.setHorizontalHeaderLabels(headers)
+    tbl.verticalHeader().setVisible(False)
+    tbl.setSelectionBehavior(qenum(W.QAbstractItemView, 'SelectionBehavior.SelectRows'))
+    tbl.setAlternatingRowColors(True)
+    hh = tbl.horizontalHeader()
+    for i in range(len(headers)):
+        hh.setSectionResizeMode(i, qenum(W.QHeaderView, 'ResizeMode.ResizeToContents'))
+    if stretch_col is not None:
+        hh.setSectionResizeMode(stretch_col, qenum(W.QHeaderView, 'ResizeMode.Stretch'))
+
+
+def source_ip_combo():
+    cb = W.QComboBox()
+    cb.setEditable(True)
+    cb.addItem('Otomatik', '')
+    for ip in local_ips():
+        if not ip.startswith('127.'):
+            cb.addItem(ip, ip)
+    cb.setToolTip('Hangi ag kartindan cikilsin (birden fazla Ethernet varsa)')
+    return cb
+
+
+def combo_value(cb):
+    i = cb.currentIndex()
+    if i >= 0 and cb.itemText(i) == cb.currentText():
+        return cb.itemData(i) or ''
+    t = cb.currentText().strip()
+    return '' if t.lower() == 'otomatik' else t
+
+
+class ToolTab(W.QWidget):
+    """Ag araci sekmeleri icin ortak taban (MainWindow uyumu)."""
+    KIND = 'tool'
+    TITLE = 'Arac'
+    transport = None
+
+    def __init__(self, main):
+        super().__init__()
+        self.main = main
+        self.connected = False
+
+    def tab_label(self):
+        return self.TITLE
+
+    def is_busy(self):
+        return False
+
+    def update_ports(self, ports):
+        pass
+
+    def store_settings(self):
+        pass
+
+    def shutdown(self):
+        pass
+
+    def set_running(self, on):
+        self.connected = on
+        self.main.session_state_changed(self)
+
+
+# --------------------------------------------------------------------------- Ag ayarlari
+COMMON_MASKS = ['255.255.255.0  (/24)', '255.255.0.0  (/16)', '255.0.0.0  (/8)', '255.255.255.128  (/25)',
+                '255.255.255.192  (/26)', '255.255.255.240  (/28)', '255.255.254.0  (/23)', '255.255.252.0  (/22)']
+
+
+class NetConfigTab(ToolTab):
+    KIND = 'netcfg'
+    TITLE = 'Ag Ayarlari'
+
+    def __init__(self, main):
+        super().__init__(main)
+        self.ifaces = []
+        self.cur = None
+        root = W.QVBoxLayout(self)
+        root.setContentsMargins(6, 6, 6, 4)
+
+        top = W.QHBoxLayout()
+        self.btn_refresh = W.QPushButton('⟳ Yenile')
+        self.btn_refresh.clicked.connect(self.refresh)
+        self.chk_virtual = W.QCheckBox('Sanal arayuzleri de goster (VPN, Docker, Hyper-V...)')
+        self.chk_virtual.toggled.connect(self.refresh)
+        self.lbl_admin = W.QLabel()
+        self.btn_admin = W.QPushButton('Yonetici izni ver')
+        self.btn_admin.clicked.connect(self.main.request_admin)
+        top.addWidget(self.btn_refresh)
+        top.addWidget(self.chk_virtual)
+        top.addStretch(1)
+        top.addWidget(self.lbl_admin)
+        top.addWidget(self.btn_admin)
+        root.addLayout(top)
+
+        split = W.QSplitter(qenum(Qt, 'Orientation.Vertical'))
+        self.table = W.QTableWidget()
+        _setup_table(self.table, ['Arayuz', 'Baglanti', 'Hiz', 'IPv4 adres(ler)', 'Gateway', 'Mod', 'DNS', 'MAC'], 3)
+        self.table.itemSelectionChanged.connect(self._selected)
+        split.addWidget(self.table)
+
+        low = W.QWidget()
+        hl = W.QHBoxLayout(low)
+        hl.setContentsMargins(0, 0, 0, 0)
+
+        # --- ayar formu
+        self.box = W.QGroupBox('Secili arayuz')
+        fl = W.QGridLayout(self.box)
+        self.rb_dhcp = W.QRadioButton('Otomatik (DHCP)')
+        self.rb_static = W.QRadioButton('Statik IP')
+        self.rb_static.setChecked(True)
+        self.rb_static.toggled.connect(self._mode_changed)
+        self.ed_ip = W.QLineEdit()
+        self.ed_ip.setPlaceholderText('192.168.1.100')
+        self.cb_mask = W.QComboBox()
+        self.cb_mask.setEditable(True)
+        self.cb_mask.addItems(COMMON_MASKS)
+        self.ed_gw = W.QLineEdit()
+        self.ed_gw.setPlaceholderText('bos birakilabilir')
+        self.ed_dns1 = W.QLineEdit()
+        self.ed_dns1.setPlaceholderText('ornek 8.8.8.8 (bos olabilir)')
+        self.ed_dns2 = W.QLineEdit()
+        rx = QtCore.QRegularExpression(r'[0-9.]*') if hasattr(QtCore, 'QRegularExpression') else None
+        if rx is not None and hasattr(QtGui, 'QRegularExpressionValidator'):
+            for e in (self.ed_ip, self.ed_gw, self.ed_dns1, self.ed_dns2):
+                e.setValidator(QtGui.QRegularExpressionValidator(rx, self))
+        self.btn_apply = W.QPushButton('Uygula')
+        self.btn_apply.setStyleSheet('QPushButton { font-weight: bold; padding: 4px 18px; }')
+        self.btn_apply.clicked.connect(lambda: self.apply('set'))
+        self.btn_add = W.QPushButton('Ek IP olarak ekle')
+        self.btn_add.setToolTip('Mevcut IP ve internet bozulmadan bu IP\'yi karta EK olarak ekler\n'
+                                '(cihazin alt agina ulasmak icin en pratik yol)')
+        self.btn_add.clicked.connect(lambda: self.apply('add'))
+        self.btn_del = W.QPushButton('Ek IP\'yi sil')
+        self.btn_del.setToolTip('Listeden secilen ek IP adresini karttan kaldir')
+        self.btn_del.clicked.connect(self.delete_extra)
+        self.cb_extra = W.QComboBox()
+        self.cb_extra.setToolTip('Bu karttaki ek IP adresleri')
+        r = 0
+        fl.addWidget(self.rb_dhcp, r, 0)
+        fl.addWidget(self.rb_static, r, 1)
+        r += 1
+        for lbl, w in (('IP adresi', self.ed_ip), ('Maske', self.cb_mask), ('Gateway', self.ed_gw),
+                       ('DNS 1', self.ed_dns1), ('DNS 2', self.ed_dns2)):
+            fl.addWidget(W.QLabel(lbl), r, 0)
+            fl.addWidget(w, r, 1)
+            r += 1
+        bl = W.QHBoxLayout()
+        bl.addWidget(self.btn_apply)
+        bl.addWidget(self.btn_add)
+        fl.addLayout(bl, r, 0, 1, 2)
+        r += 1
+        el = W.QHBoxLayout()
+        el.addWidget(W.QLabel('Ek IP\'ler'))
+        el.addWidget(self.cb_extra, 1)
+        el.addWidget(self.btn_del)
+        fl.addLayout(el, r, 0, 1, 2)
+        fl.setRowStretch(r + 1, 1)
+        fl.setVerticalSpacing(6)
+        hl.addWidget(self.box, 3)
+
+        # --- otomatik IP + profiller + gunluk
+        right = W.QVBoxLayout()
+        auto = W.QGroupBox('Otomatik IP: cihazin agina gec')
+        al = W.QGridLayout(auto)
+        self.ed_dev = W.QLineEdit()
+        self.ed_dev.setPlaceholderText('cihazin IP\'si, ornek 192.168.10.50')
+        self.btn_find = W.QPushButton('Bos IP bul')
+        self.btn_find.clicked.connect(self.find_free)
+        self.lbl_auto = W.QLabel('Cihazin IP\'sini yazin: ayni alt agda bos bir IP bulunup forma doldurulur.\n'
+                                 'Sonra "Ek IP olarak ekle" (internet bozulmaz) veya "Uygula".')
+        self.lbl_auto.setWordWrap(True)
+        self.lbl_auto.setStyleSheet('color:#888')
+        al.addWidget(self.ed_dev, 0, 0)
+        al.addWidget(self.btn_find, 0, 1)
+        al.addWidget(self.lbl_auto, 1, 0, 1, 2)
+        right.addWidget(auto)
+
+        prof = W.QGroupBox('Profiller (kayitli ayarlar)')
+        pl = W.QHBoxLayout(prof)
+        self.cb_prof = W.QComboBox()
+        self.cb_prof.setMinimumWidth(160)
+        b_load = W.QPushButton('Forma yukle')
+        b_load.clicked.connect(self.load_profile)
+        b_save = W.QPushButton('Formu kaydet...')
+        b_save.clicked.connect(self.save_profile)
+        b_delp = W.QPushButton('Sil')
+        b_delp.clicked.connect(self.delete_profile)
+        pl.addWidget(self.cb_prof, 1)
+        for b in (b_load, b_save, b_delp):
+            pl.addWidget(b)
+        right.addWidget(prof)
+        self.log = Terminal()
+        self.log.setMaximumBlockCount(2000)
+        self.log.setLineWrapMode(qenum(W.QPlainTextEdit, 'LineWrapMode.WidgetWidth'))
+        right.addWidget(self.log, 1)
+        hl.addLayout(right, 4)
+        split.addWidget(low)
+        split.setStretchFactor(0, 2)
+        split.setStretchFactor(1, 3)
+        root.addWidget(split, 1)
+
+        self.fmt = core.Formatter()
+        self._load_profiles()
+        self.update_admin_label()
+        self._mode_changed()
+        self.refresh()
+
+    # -- yardimcilar
+    def say(self, text, level='info'):
+        self.log.write_segments(self.fmt.text_line(time.time(), level, text))
+
+    def update_admin_label(self):
+        st = self.main.admin_state()
+        self.lbl_admin.setText(st[1])
+        self.btn_admin.setVisible(not st[0] and not net.IS_WIN)
+
+    def _mode_changed(self, *_):
+        st = self.rb_static.isChecked()
+        for w in (self.ed_ip, self.cb_mask, self.ed_gw, self.ed_dns1, self.ed_dns2):
+            w.setEnabled(st)
+
+    def refresh(self, *_):
+        self.btn_refresh.setEnabled(False)
+        self.btn_refresh.setText('Okunuyor...')
+        inc = self.chk_virtual.isChecked()
+        _bg(self, lambda: net.list_interfaces(include_virtual=inc), self._fill)
+
+    def _fill(self, lst, err):
+        self.btn_refresh.setEnabled(True)
+        self.btn_refresh.setText('⟳ Yenile')
+        if err:
+            self.say(f'Arayuzler okunamadi: {err}', 'error')
+            return
+        keep = self.cur.key if self.cur else None
+        self.ifaces = lst or []
+        t = self.table
+        t.setRowCount(len(self.ifaces))
+        sel = 0
+        for r, it in enumerate(self.ifaces):
+            up = '● bagli' if it.up else ('○ kablo yok' if it.up is False else '?')
+            col = '#2da44e' if it.up else '#888'
+            mode = {True: 'DHCP', False: 'Statik', None: '-'}[it.dhcp]
+            kind = {'wifi': ' (Wi-Fi)', 'virtual': ' (sanal)'}.get(it.kind, '')
+            vals = [it.display + kind, up, f'{it.speed} Mbit/s' if it.speed else '-',
+                    ', '.join(f'{a}/{p}' for a, p in it.addrs) or '-', it.gateway or '-', mode,
+                    ', '.join(it.dns) or '-', it.mac or '-']
+            for c, v in enumerate(vals):
+                t.setItem(r, c, _ro_item(v, col if c == 1 else None))
+            if it.desc:
+                t.item(r, 0).setToolTip(it.desc)
+            if it.key == keep:
+                sel = r
+        if self.ifaces:
+            t.selectRow(sel)
+        else:
+            self.say('Ag arayuzu bulunamadi', 'warn')
+        self.main.ifaces_changed(self.ifaces)
+
+    def _selected(self):
+        rows = {i.row() for i in self.table.selectedItems()}
+        if not rows:
+            return
+        it = self.ifaces[min(rows)]
+        self.cur = it
+        self.box.setTitle(f'Secili arayuz: {it.display}' + (f'   ({it.desc})' if it.desc and it.desc != it.display else ''))
+        (self.rb_dhcp if it.dhcp else self.rb_static).setChecked(True)
+        self.ed_ip.setText(it.ip)
+        self.cb_mask.setCurrentText(net.prefix_to_mask(it.prefix) + f'  (/{it.prefix})' if it.addrs else COMMON_MASKS[0])
+        self.ed_gw.setText(it.gateway)
+        self.ed_dns1.setText(it.dns[0] if it.dns else '')
+        self.ed_dns2.setText(it.dns[1] if len(it.dns) > 1 else '')
+        self.cb_extra.clear()
+        for a, p in it.addrs[1:]:
+            self.cb_extra.addItem(f'{a}/{p}', (a, p))
+        self.btn_del.setEnabled(self.cb_extra.count() > 0)
+
+    def _mask_text(self):
+        return self.cb_mask.currentText().split('(')[0].strip() or '24'
+
+    # -- uygulama
+    def apply(self, action, ip=None, mask=None):
+        it = self.cur
+        if it is None:
+            self.say('Once listeden bir arayuz secin', 'warn')
+            return
+        mode = 'dhcp' if (self.rb_dhcp.isChecked() and action == 'set') else 'static'
+        try:
+            plan = net.make_plan(it, mode, ip or self.ed_ip.text().strip(), mask or self._mask_text(),
+                                 self.ed_gw.text().strip() if action == 'set' else '',
+                                 [self.ed_dns1.text().strip(), self.ed_dns2.text().strip()] if action == 'set' else [],
+                                 action)
+        except ValueError as e:
+            self.say(str(e), 'error')
+            return
+        warn = ''
+        if action == 'set' and it.gateway:
+            warn = ('\n\nDIKKAT: Bu kart su an varsayilan ag gecidine (internet/uzak baglanti) sahip. '
+                    'Degistirirseniz bu karttan yapilan baglantilar kopabilir. Interneti korumak icin '
+                    '"Ek IP olarak ekle" kullanabilirsiniz.')
+        msg = f'{plan.title}\n\nCalistirilacak komutlar:\n{plan.text()}' + \
+              (f'\n\nNot: {plan.note}' if plan.note else '') + warn
+        box = W.QMessageBox(self)
+        box.setWindowTitle('Ag ayarini uygula')
+        box.setIcon(qenum(W.QMessageBox, 'Icon.Warning' if warn else 'Icon.Question'))
+        box.setText(msg)
+        box.setStandardButtons(qenum(W.QMessageBox, 'StandardButton.Yes') | qenum(W.QMessageBox, 'StandardButton.No'))
+        if qexec(box) != qenum(W.QMessageBox, 'StandardButton.Yes'):
+            return
+        self.say(f'Uygulaniyor: {plan.title}')
+        for b in (self.btn_apply, self.btn_add, self.btn_del):
+            b.setEnabled(False)
+        _bg(self, lambda: net.apply_plan(plan), self._applied)
+
+    def _applied(self, res, err):
+        for b in (self.btn_apply, self.btn_add):
+            b.setEnabled(True)
+        self.btn_del.setEnabled(self.cb_extra.count() > 0)
+        if err:
+            self.say(f'Hata: {err}', 'error')
+            return
+        ok, out = res
+        if out:
+            self.say(out, 'info' if ok else 'error')
+        self.say('Basarili. Liste yenileniyor (DHCP birkac saniye surebilir)...' if ok else 'BASARISIZ', 'info' if ok else 'error')
+        QtCore.QTimer.singleShot(1500, self.refresh)
+        QtCore.QTimer.singleShot(6000, self.refresh)
+
+    def delete_extra(self):
+        d = self.cb_extra.currentData()
+        if d:
+            self.apply('del', ip=d[0], mask=str(d[1]))
+
+    # -- otomatik IP
+    def find_free(self, device_ip=None):
+        dev = (device_ip or self.ed_dev.text()).strip()
+        if device_ip:
+            self.ed_dev.setText(dev)
+        if not net.is_ipv4(dev):
+            self.say('Gecerli bir cihaz IP\'si girin', 'warn')
+            return
+        prefix = 24
+        self.btn_find.setEnabled(False)
+        self.lbl_auto.setText(f'{net.subnet_of(dev, prefix)} aginda bos IP araniyor...')
+        mine = [a for i in self.ifaces for a, _ in i.addrs]
+        _bg(self, lambda: (net.suggest_free_ip(dev, prefix, exclude=mine),
+                           net.Pinger().ping(dev, 800).ok), lambda r, e: self._found(dev, prefix, r, e))
+
+    def _found(self, dev, prefix, res, err):
+        self.btn_find.setEnabled(True)
+        if err or not res or not res[0]:
+            self.lbl_auto.setText(f'Bos IP bulunamadi ({err or "alt ag dolu?"})')
+            return
+        ip, alive = res
+        self.rb_static.setChecked(True)
+        self.ed_ip.setText(ip)
+        self.cb_mask.setCurrentText(f'{net.prefix_to_mask(prefix)}  (/{prefix})')
+        self.ed_gw.setText('')
+        self.lbl_auto.setText(f'Onerilen: {ip}/{prefix}  (cihaz {dev} ' +
+                              ('su an pinge CEVAP VERIYOR' if alive else 'henuz cevap vermiyor; farkli alt agda oldugu icin normal') +
+                              ').\n"Ek IP olarak ekle" ile internetiniz bozulmadan cihaza ulasabilirsiniz.')
+
+    # -- profiller
+    def _load_profiles(self):
+        try:
+            self.profiles = json.loads(self.main.settings.value('net/profiles', '[]') or '[]')
+        except ValueError:
+            self.profiles = []
+        self.cb_prof.clear()
+        for p in self.profiles:
+            self.cb_prof.addItem(p.get('name', '?'))
+
+    def save_profile(self):
+        name, ok = W.QInputDialog.getText(self, 'Profil kaydet', 'Profil adi (ornek: Jetson agi):')
+        if not ok or not name.strip():
+            return
+        p = {'name': name.strip(), 'mode': 'dhcp' if self.rb_dhcp.isChecked() else 'static',
+             'ip': self.ed_ip.text().strip(), 'mask': self._mask_text(), 'gw': self.ed_gw.text().strip(),
+             'dns1': self.ed_dns1.text().strip(), 'dns2': self.ed_dns2.text().strip()}
+        self.profiles = [x for x in self.profiles if x.get('name') != p['name']] + [p]
+        self.main.settings.setValue('net/profiles', json.dumps(self.profiles))
+        self._load_profiles()
+        self.cb_prof.setCurrentText(p['name'])
+        self.say(f'Profil kaydedildi: {p["name"]}')
+
+    def load_profile(self):
+        i = self.cb_prof.currentIndex()
+        if i < 0 or i >= len(self.profiles):
+            return
+        p = self.profiles[i]
+        (self.rb_dhcp if p.get('mode') == 'dhcp' else self.rb_static).setChecked(True)
+        self.ed_ip.setText(p.get('ip', ''))
+        try:
+            m, pre = net.parse_mask(p.get('mask', '24'))
+            self.cb_mask.setCurrentText(f'{m}  (/{pre})')
+        except ValueError:
+            pass
+        self.ed_gw.setText(p.get('gw', ''))
+        self.ed_dns1.setText(p.get('dns1', ''))
+        self.ed_dns2.setText(p.get('dns2', ''))
+        self.say(f'Profil forma yuklendi: {p.get("name")}. Uygulamak icin "Uygula" veya "Ek IP olarak ekle".')
+
+    def delete_profile(self):
+        i = self.cb_prof.currentIndex()
+        if 0 <= i < len(self.profiles):
+            del self.profiles[i]
+            self.main.settings.setValue('net/profiles', json.dumps(self.profiles))
+            self._load_profiles()
+
+
+# --------------------------------------------------------------------------- Ping
+class PingTab(ToolTab):
+    KIND = 'ping'
+    TITLE = 'Ping'
+
+    def __init__(self, main):
+        super().__init__(main)
+        self.workers = []
+        self.rows = {}
+        root = W.QVBoxLayout(self)
+        root.setContentsMargins(6, 6, 6, 4)
+        top = W.QHBoxLayout()
+        self.ed_hosts = W.QLineEdit(main.settings.value('ping/hosts', '8.8.8.8') or '8.8.8.8')
+        self.ed_hosts.setPlaceholderText('Hedef(ler): 192.168.1.10, 192.168.1.20, google.com')
+        self.ed_hosts.returnPressed.connect(self.toggle)
+        self.sp_int = W.QSpinBox()
+        self.sp_int.setRange(10, 60000)
+        self.sp_int.setValue(1000)
+        self.sp_int.setSuffix(' ms')
+        self.sp_to = W.QSpinBox()
+        self.sp_to.setRange(50, 30000)
+        self.sp_to.setValue(1000)
+        self.sp_to.setSuffix(' ms')
+        self.sp_size = W.QSpinBox()
+        self.sp_size.setRange(0, 65000)
+        self.sp_size.setValue(32)
+        self.sp_size.setSuffix(' B')
+        self.sp_cnt = W.QSpinBox()
+        self.sp_cnt.setRange(0, 1000000)
+        self.sp_cnt.setSpecialValueText('surekli')
+        self.cb_src = source_ip_combo()
+        self.btn = W.QPushButton('Baslat')
+        self.btn.setMinimumWidth(100)
+        self.btn.clicked.connect(self.toggle)
+        top.addWidget(W.QLabel('Hedef'))
+        top.addWidget(self.ed_hosts, 1)
+        for lbl, w in (('Aralik', self.sp_int), ('Zaman asimi', self.sp_to), ('Boyut', self.sp_size),
+                       ('Sayi', self.sp_cnt), ('Kaynak', self.cb_src)):
+            top.addWidget(W.QLabel(lbl))
+            top.addWidget(w)
+        top.addWidget(self.btn)
+        root.addLayout(top)
+
+        self.table = W.QTableWidget()
+        _setup_table(self.table, ['Hedef', 'IP', 'Durum', 'Son', 'Ort', 'Min', 'Max', 'Jitter', 'Kayip', 'Gonderilen'], 0)
+        self.table.setMaximumHeight(170)
+        self.table.itemSelectionChanged.connect(self._sel)
+        root.addWidget(self.table)
+        self.graph = LineGraph('ms', '#7ee787', fmt='{:.1f}')
+        root.addWidget(self.graph)
+        opt = W.QHBoxLayout()
+        self.chk_changes = W.QCheckBox('Gunluge sadece durum degisimlerini yaz (cevap geldi / kesildi)')
+        self.chk_beep = W.QCheckBox('Durum degisince bip')
+        b_clear = W.QPushButton('Temizle')
+        opt.addWidget(self.chk_changes)
+        opt.addWidget(self.chk_beep)
+        opt.addStretch(1)
+        opt.addWidget(b_clear)
+        root.addLayout(opt)
+        self.log = Terminal()
+        self.log.setMaximumBlockCount(20000)
+        root.addWidget(self.log, 1)
+        b_clear.clicked.connect(self.clear)
+        self.fmt = core.Formatter()
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.drain)
+        self.timer.start(100)
+        self.sel_host = None
+
+    def is_busy(self):
+        return bool(self.workers)
+
+    def tab_label(self):
+        return 'Ping' + (f' ({len(self.workers)})' if self.workers else '')
+
+    def add_host(self, host):
+        cur = [h.strip() for h in self.ed_hosts.text().split(',') if h.strip()]
+        if host not in cur:
+            cur.append(host)
+        self.ed_hosts.setText(', '.join(cur))
+
+    def clear(self):
+        self.log.clear()
+        self.graph.clear()
+        for st in self.rows.values():
+            st['hist'].clear()
+
+    def toggle(self):
+        if self.workers:
+            self.stop()
+            return
+        hosts = [h.strip() for h in self.ed_hosts.text().replace(';', ',').split(',') if h.strip()]
+        if not hosts:
+            return
+        self.main.settings.setValue('ping/hosts', self.ed_hosts.text())
+        self.rows = {}
+        self.table.setRowCount(len(hosts))
+        for r, h in enumerate(hosts):
+            self.rows[h] = {'row': r, 'sent': 0, 'recv': 0, 'rtts': [], 'last_ok': None, 'min': None,
+                            'max': None, 'sum': 0.0, 'jit': 0.0, 'prev': None,
+                            'hist': collections.deque(maxlen=120)}
+            for c, v in enumerate([h, '...', 'basliyor', '-', '-', '-', '-', '-', '-', '0']):
+                self.table.setItem(r, c, _ro_item(v, align_right=c >= 3))
+            w = net.PingWorker(h, self.sp_int.value() / 1000.0, self.sp_to.value(), self.sp_size.value(),
+                               self.sp_cnt.value(), combo_value(self.cb_src))
+            w.start()
+            self.workers.append((h, w))
+        self.sel_host = hosts[0]
+        self.table.selectRow(0)
+        self.graph.clear()
+        self.graph.title = hosts[0]
+        self.btn.setText('Durdur')
+        self.set_running(True)
+
+    def stop(self):
+        for _, w in self.workers:
+            w.stop()
+
+    def _sel(self):
+        rows = {i.row() for i in self.table.selectedItems()}
+        for h, st in self.rows.items():
+            if st['row'] in rows:
+                self.sel_host = h
+                self.graph.vals.clear()
+                self.graph.vals.extend(st['hist'])
+                self.graph.title = h
+                self.graph.update()
+                break
+
+    def drain(self):
+        if not self.workers:
+            return
+        segs = []
+        alive = []
+        for h, w in self.workers:
+            st = self.rows[h]
+            ended = False
+            while w.events:
+                ev = w.events.popleft()
+                if ev[0] == 'info':
+                    segs += self.fmt.text_line(ev[1], 'warn', ev[2])
+                elif ev[0] == 'end':
+                    ended = True
+                elif ev[0] == 'reply':
+                    segs += self._reply(h, st, w, ev[1], ev[2], ev[3])
+            if not ended:
+                alive.append((h, w))
+        if segs:
+            self.log.write_segments(segs)
+        self.workers = alive
+        if not alive:
+            self.btn.setText('Baslat')
+            self.set_running(False)
+
+    def _reply(self, h, st, w, ts, seq, r):
+        row = st['row']
+        st['sent'] += 1
+        segs = []
+        changed = st['last_ok'] is not None and st['last_ok'] != r.ok
+        first = st['last_ok'] is None
+        st['last_ok'] = r.ok
+        if r.ok:
+            st['recv'] += 1
+            st['sum'] += r.rtt
+            st['min'] = r.rtt if st['min'] is None else min(st['min'], r.rtt)
+            st['max'] = r.rtt if st['max'] is None else max(st['max'], r.rtt)
+            if st['prev'] is not None:
+                st['jit'] += (abs(r.rtt - st['prev']) - st['jit']) / 16.0
+            st['prev'] = r.rtt
+            st['hist'].append(r.rtt)
+        else:
+            st['hist'].append(None)
+        if h == self.sel_host:
+            self.graph.add(st['hist'][-1])
+        loss = 100.0 * (st['sent'] - st['recv']) / st['sent']
+        avg = st['sum'] / st['recv'] if st['recv'] else None
+        f = lambda v: f'{v:.2f} ms' if v is not None else '-'   # noqa: E731
+        vals = {1: w.ip or '?', 2: ('● cevap veriyor' if r.ok else '✖ ' + r.err),
+                3: f(r.rtt if r.ok else None), 4: f(avg), 5: f(st['min']), 6: f(st['max']),
+                7: f(st['jit'] if st['recv'] > 1 else None), 8: f'%{loss:.1f}',
+                9: f'{st["sent"]} / {st["recv"]}'}
+        for c, v in vals.items():
+            it = self.table.item(row, c)
+            if it:
+                it.setText(v)
+                if c == 2:
+                    it.setForeground(QtGui.QBrush(QtGui.QColor('#2da44e' if r.ok else COLORS['error'])))
+        if changed or first:
+            if changed or not r.ok:
+                txt = f'{h}: ▲ CEVAP VERMEYE BASLADI' if r.ok else f'{h}: ▼ CEVAP KESILDI ({r.err})'
+                if first and not r.ok:
+                    txt = f'{h}: cevap vermiyor ({r.err})'
+                segs += self.fmt.text_line(ts, 'info' if r.ok else 'error', txt)
+                if self.chk_beep.isChecked() and changed:
+                    W.QApplication.beep()
+        if not self.chk_changes.isChecked():
+            stamp = time.strftime('%H:%M:%S', time.localtime(ts)) + f'.{int((ts % 1) * 1000):03d}'
+            if r.ok:
+                ttl = f'  TTL={r.ttl}' if r.ttl else ''
+                segs.append(('hdr', f'{stamp} '))
+                segs.append((RX, f'{h} ({w.ip})  sira={seq}  sure={r.rtt:.2f} ms{ttl}\n'))
+            else:
+                segs.append(('hdr', f'{stamp} '))
+                segs.append(('error', f'{h}  sira={seq}  {r.err}\n'))
+        return segs
+
+    def shutdown(self):
+        self.stop()
+
+
+# --------------------------------------------------------------------------- IP tarama
+class ScanTab(ToolTab):
+    KIND = 'scan'
+    TITLE = 'IP Tarama'
+
+    def __init__(self, main):
+        super().__init__(main)
+        self.scanner = None
+        self.rowmap = {}
+        root = W.QVBoxLayout(self)
+        root.setContentsMargins(6, 6, 6, 4)
+        top = W.QHBoxLayout()
+        self.cb_if = W.QComboBox()
+        self.cb_if.setMinimumWidth(260)
+        self.cb_if.currentIndexChanged.connect(self._if_changed)
+        self.ed_range = W.QLineEdit('192.168.1.1-254')
+        self.ed_range.setPlaceholderText('192.168.1.0/24  veya  192.168.1.1-254  veya  10.0.0.5-10.0.0.40')
+        self.ed_range.returnPressed.connect(self.toggle)
+        self.sp_to = W.QSpinBox()
+        self.sp_to.setRange(100, 5000)
+        self.sp_to.setValue(500)
+        self.sp_to.setSuffix(' ms')
+        self.btn = W.QPushButton('Tara')
+        self.btn.setMinimumWidth(100)
+        self.btn.clicked.connect(self.toggle)
+        top.addWidget(W.QLabel('Ag karti'))
+        top.addWidget(self.cb_if)
+        top.addWidget(W.QLabel('Aralik'))
+        top.addWidget(self.ed_range, 1)
+        top.addWidget(W.QLabel('Zaman asimi'))
+        top.addWidget(self.sp_to)
+        top.addWidget(self.btn)
+        root.addLayout(top)
+        self.prog = W.QProgressBar()
+        self.prog.setTextVisible(True)
+        root.addWidget(self.prog)
+        self.table = W.QTableWidget()
+        _setup_table(self.table, ['IP', 'Sure', 'TTL (tahmini sistem)', 'MAC', 'Host adi'], 4)
+        self.table.setSortingEnabled(True)
+        self.table.setContextMenuPolicy(qenum(Qt, 'ContextMenuPolicy.CustomContextMenu'))
+        self.table.customContextMenuRequested.connect(self._menu)
+        self.table.doubleClicked.connect(lambda *_: self._copy())
+        root.addWidget(self.table, 1)
+        self.lbl = W.QLabel('Sag tik: kopyala / Ping\'e ekle / bu cihazin agina gec.  Cift tik: IP kopyala.')
+        self.lbl.setStyleSheet('color:#888')
+        root.addWidget(self.lbl)
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.drain)
+        self.timer.start(100)
+        self.ifaces_changed(main.ifaces)
+
+    def is_busy(self):
+        return self.scanner is not None
+
+    def ifaces_changed(self, ifaces):
+        cur = self.cb_if.currentData()
+        self.cb_if.blockSignals(True)
+        self.cb_if.clear()
+        for it in ifaces:
+            for a, p in it.addrs:
+                if not a.startswith('127.') and not a.startswith('169.254.'):
+                    self.cb_if.addItem(f'{it.display}: {a}/{p}', (a, p))
+        if self.cb_if.count() == 0:
+            self.cb_if.addItem('(ag karti listesi bekleniyor)', None)
+        i = self.cb_if.findData(cur) if cur else -1
+        self.cb_if.setCurrentIndex(max(0, i))
+        self.cb_if.blockSignals(False)
+        if cur is None:
+            self._if_changed()
+
+    def _if_changed(self, *_):
+        d = self.cb_if.currentData()
+        if d:
+            a, p = d
+            p = max(p, 22)      # cok buyuk aglarda /22'den fazlasini varsayilan tarama
+            self.ed_range.setText(net.subnet_of(a, p))
+
+    def toggle(self):
+        if self.scanner:
+            self.scanner.stop()
+            return
+        try:
+            ips = net.parse_range(self.ed_range.text())
+        except ValueError as e:
+            self.lbl.setText(str(e))
+            return
+        self.table.setSortingEnabled(False)
+        self.table.setRowCount(0)
+        self.rowmap = {}
+        d = self.cb_if.currentData()
+        self.scanner = net.Scanner(ips, self.sp_to.value(), source=d[0] if d else '')
+        self.scanner.start()
+        self.prog.setRange(0, len(ips))
+        self.prog.setValue(0)
+        self.btn.setText('Durdur')
+        self.lbl.setText(f'{len(ips)} adres taraniyor...')
+        self.set_running(True)
+
+    def _row(self, ip):
+        if ip in self.rowmap:
+            return self.rowmap[ip]
+        r = self.table.rowCount()
+        self.table.insertRow(r)
+        it = _ro_item(ip)
+        it.setData(qenum(Qt, 'ItemDataRole.UserRole'), net.ip2int(ip))
+        self.table.setItem(r, 0, it)
+        for c in range(1, 5):
+            self.table.setItem(r, c, _ro_item('-'))
+        self.rowmap[ip] = r
+        return r
+
+    def drain(self):
+        s = self.scanner
+        if not s:
+            return
+        while s.events:
+            ev = s.events.popleft()
+            k = ev[0]
+            if k == 'host':
+                r = self._row(ev[1])
+                self.table.item(r, 1).setText(f'{ev[2]:.1f} ms' if ev[2] is not None else 'ping yok (ARP\'de var)')
+                ttl = ev[3]
+                guess = '' if ttl is None else (' Linux/Jetson/cihaz' if ttl <= 64 else
+                                                (' Windows' if ttl <= 128 else ' ag cihazi'))
+                self.table.item(r, 2).setText(f'{ttl}{guess}' if ttl else '-')
+            elif k == 'mac':
+                self.table.item(self._row(ev[1]), 3).setText(ev[2])
+            elif k == 'name':
+                self.table.item(self._row(ev[1]), 4).setText(ev[2])
+            elif k == 'progress':
+                self.prog.setValue(ev[1])
+            elif k == 'end':
+                self.lbl.setText(f'Bitti: {ev[1]} cihaz bulundu ({ev[2]:.1f} sn). '
+                                 f'Sag tik: kopyala / Ping\'e ekle / bu cihazin agina gec.')
+                self.prog.setValue(self.prog.maximum())
+                self.scanner = None
+                self.btn.setText('Tara')
+                self.table.setSortingEnabled(True)
+                self.table.sortItems(0)
+                self.set_running(False)
+
+    def _ip_at(self, row=None):
+        if row is None:
+            rows = sorted({i.row() for i in self.table.selectedItems()})
+            if not rows:
+                return None
+            row = rows[0]
+        it = self.table.item(row, 0)
+        return it.text() if it else None
+
+    def _copy(self):
+        ip = self._ip_at()
+        if ip:
+            W.QApplication.clipboard().setText(ip)
+            self.main.statusBar().showMessage(f'Kopyalandi: {ip}', 3000)
+
+    def _menu(self, pos):
+        ip = self._ip_at()
+        if not ip:
+            return
+        m = W.QMenu(self)
+        m.addAction(f'{ip} kopyala').triggered.connect(self._copy)
+        m.addAction('Ping sekmesine ekle').triggered.connect(lambda: self.main.send_to_ping(ip))
+        m.addAction('iPerf hedefi yap').triggered.connect(lambda: self.main.send_to_iperf(ip))
+        m.addAction('TCP Istemci hedefi yap').triggered.connect(lambda: self.main.send_to_tcp(ip))
+        qexec_at(m, self.table.viewport().mapToGlobal(pos))
+
+    def shutdown(self):
+        if self.scanner:
+            self.scanner.stop()
+
+
+def qexec_at(menu, pos):
+    return menu.exec(pos) if hasattr(menu, 'exec') else menu.exec_(pos)
+
+
+# --------------------------------------------------------------------------- iPerf
+class IperfTab(ToolTab):
+    KIND = 'iperf'
+    TITLE = 'iPerf'
+
+    def __init__(self, main):
+        super().__init__(main)
+        self.job = None
+        st = main.settings
+        root = W.QVBoxLayout(self)
+        root.setContentsMargins(6, 6, 6, 4)
+        r1 = W.QHBoxLayout()
+        self.rb_client = W.QRadioButton('Istemci (karsiya baglan)')
+        self.rb_server = W.QRadioButton('Sunucu (bekle)')
+        self.rb_client.setChecked(True)
+        self.rb_client.toggled.connect(self._mode)
+        self.ed_host = W.QLineEdit(st.value('iperf/host', '') or '')
+        self.ed_host.setPlaceholderText('karsi cihazin IP\'si (orada: iperf3 -s)')
+        self.ed_host.returnPressed.connect(self.toggle)
+        self.sp_port = W.QSpinBox()
+        self.sp_port.setRange(1, 65535)
+        self.sp_port.setValue(5201)
+        self.cb_proto = W.QComboBox()
+        self.cb_proto.addItems(['TCP', 'UDP'])
+        self.cb_proto.currentIndexChanged.connect(self._mode)
+        self.sp_time = W.QSpinBox()
+        self.sp_time.setRange(1, 86400)
+        self.sp_time.setValue(10)
+        self.sp_time.setSuffix(' sn')
+        self.sp_par = W.QSpinBox()
+        self.sp_par.setRange(1, 64)
+        self.sp_par.setToolTip('Paralel akis sayisi (-P). 10G aglarda 4-8 deneyin.')
+        self.chk_rev = W.QCheckBox('Ters yon (-R)')
+        self.chk_rev.setToolTip('Isaretliyse karsi taraf GONDERIR, bu PC alir (indirme yonu)')
+        self.sp_bw = W.QDoubleSpinBox()
+        self.sp_bw.setRange(0, 100000)
+        self.sp_bw.setDecimals(1)
+        self.sp_bw.setSuffix(' Mbit/s')
+        self.sp_bw.setSpecialValueText('sinirsiz')
+        self.sp_bw.setToolTip('Hedef hiz (-b). TCP: 0 = sinirsiz. UDP: zorunlu (varsayilan 100).')
+        self.cb_src = source_ip_combo()
+        self.btn = W.QPushButton('Baslat')
+        self.btn.setMinimumWidth(110)
+        self.btn.clicked.connect(self.toggle)
+        r1.addWidget(self.rb_client)
+        r1.addWidget(self.rb_server)
+        r1.addSpacing(10)
+        self.lbl_host = W.QLabel('Sunucu')
+        r1.addWidget(self.lbl_host)
+        r1.addWidget(self.ed_host, 1)
+        r1.addWidget(W.QLabel('Port'))
+        r1.addWidget(self.sp_port)
+        r1.addWidget(self.btn)
+        root.addLayout(r1)
+        r2 = W.QHBoxLayout()
+        self.opts = []
+        for lbl, w in (('Protokol', self.cb_proto), ('Sure', self.sp_time), ('Paralel', self.sp_par),
+                       ('Hiz', self.sp_bw), ('Kaynak', self.cb_src)):
+            l_ = W.QLabel(lbl)
+            r2.addWidget(l_)
+            r2.addWidget(w)
+            self.opts += [l_, w]
+        r2.addWidget(self.chk_rev)
+        self.opts.append(self.chk_rev)
+        r2.addStretch(1)
+        root.addLayout(r2)
+        self.lbl_help = W.QLabel()
+        self.lbl_help.setWordWrap(True)
+        self.lbl_help.setStyleSheet('color:#888')
+        root.addWidget(self.lbl_help)
+
+        big = W.QHBoxLayout()
+        self.lbl_rate = W.QLabel('—')
+        f = self.lbl_rate.font()
+        f.setPointSize(f.pointSize() + 14)
+        f.setBold(True)
+        self.lbl_rate.setFont(f)
+        self.lbl_rate.setStyleSheet('color:#79c0ff')
+        self.lbl_sum = W.QLabel('')
+        self.lbl_sum.setStyleSheet('color:#888')
+        big.addWidget(self.lbl_rate)
+        big.addSpacing(20)
+        big.addWidget(self.lbl_sum, 1)
+        root.addLayout(big)
+        self.graph = LineGraph('Mbit/s', '#79c0ff', fmt='{:.0f}')
+        self.graph.setMinimumHeight(150)
+        root.addWidget(self.graph)
+        self.log = Terminal()
+        self.log.setMaximumBlockCount(20000)
+        root.addWidget(self.log, 1)
+        self.fmt = core.Formatter()
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.drain)
+        self.timer.start(100)
+        self._mode()
+
+    def is_busy(self):
+        return self.job is not None
+
+    def tab_label(self):
+        return 'iPerf' + (' ●' if self.job else '')
+
+    def _mode(self, *_):
+        cli = self.rb_client.isChecked()
+        self.ed_host.setEnabled(cli)
+        self.lbl_host.setText('Sunucu' if cli else 'Dinle')
+        for w in self.opts:
+            w.setEnabled(cli)
+        if self.cb_proto.currentText() == 'UDP' and self.sp_bw.value() == 0:
+            self.sp_bw.setValue(100)
+        ips = ', '.join(ip for ip in local_ips() if not ip.startswith('127.')) or '-'
+        if cli:
+            self.lbl_help.setText('Karsi cihazda iperf3 sunucusu calismali:  iperf3 -s   (Jetson/Ubuntu: sudo apt install iperf3).  '
+                                  'Ya da karsi PC\'de BYSTerm > iPerf > Sunucu.  Olculen, iki uc arasindan GERCEKTEN gecen net hizdir.')
+        else:
+            self.lbl_help.setText(f'Bu PC bekliyor. Karsi cihazdan:  iperf3 -c <bu PC IP> -p {self.sp_port.value()}   '
+                                  f'(-R: bu PC gonderir, -u -b 100M: UDP).   Bu PC\'nin IP\'leri: {ips}')
+
+    def say(self, text, level='info'):
+        self.log.write_segments(self.fmt.text_line(time.time(), level, text))
+
+    def toggle(self):
+        if self.job:
+            self.job.stop()
+            self.btn.setEnabled(False)
+            return
+        self.graph.clear()
+        self.lbl_rate.setText('—')
+        self.lbl_sum.setText('')
+        try:
+            if self.rb_client.isChecked():
+                host = self.ed_host.text().strip()
+                if not host:
+                    self.say('Sunucu adresini girin', 'warn')
+                    return
+                self.main.settings.setValue('iperf/host', host)
+                udp = self.cb_proto.currentText() == 'UDP'
+                bw = int(self.sp_bw.value() * 1e6)
+                self.job = net.IperfClient(host, self.sp_port.value(), udp, self.sp_time.value(),
+                                           self.sp_par.value(), self.chk_rev.isChecked(), bw,
+                                           bind=combo_value(self.cb_src))
+                self.graph.title = f'{host} {"UDP" if udp else "TCP"}' + (' (ters)' if self.chk_rev.isChecked() else '')
+            else:
+                self.job = net.IperfServer(self.sp_port.value(), '')
+                self.graph.title = f'sunucu :{self.sp_port.value()}'
+            self.job.start()
+        except OSError as e:
+            self.say(f'Baslatilamadi: {e}', 'error')
+            self.job = None
+            return
+        self.btn.setText('Durdur')
+        self.set_running(True)
+
+    def drain(self):
+        j = self.job
+        if not j:
+            return
+        segs = []
+        ended = False
+        while j.events:
+            ev = j.events.popleft()
+            k = ev[0]
+            if k == 'info':
+                segs += self.fmt.text_line(ev[1], ev[2], ev[3])
+            elif k == 'interval':
+                _, a, b, nbytes, bps, extra = ev
+                self.graph.add(bps / 1e6)
+                self.lbl_rate.setText(net.fmt_rate(bps))
+                line = f'[{a:6.1f} - {b:6.1f} sn]  {net.fmt_bytes(nbytes):>10}  {net.fmt_rate(bps):>14}'
+                if extra:
+                    line += f'   jitter {extra["jitter_ms"]:.3f} ms   kayip {extra["lost"]}/{extra["packets"]}'
+                segs.append((RX, line + '\n'))
+            elif k == 'result':
+                r = ev[2]
+                lines = [f'── SONUC ({r["elapsed"]:.1f} sn) ──',
+                         f'  Gonderen: {net.fmt_bytes(r["sent_bytes"]):>10}  {net.fmt_rate(r["sent_bps"]):>14}',
+                         f'  Alan    : {net.fmt_bytes(r["recv_bytes"]):>10}  {net.fmt_rate(r["recv_bps"]):>14}']
+                summ = f'Alan tarafta olculen: {net.fmt_rate(r["recv_bps"])}'
+                if r.get('udp'):
+                    pk = r.get('packets') or 0
+                    lost = r.get('lost', 0)
+                    pct = 100.0 * lost / pk if pk else 0
+                    lines.append(f'  UDP     : jitter {r.get("jitter_ms", 0):.3f} ms   kayip {lost}/{pk} (%{pct:.2f})')
+                    summ += f'   jitter {r.get("jitter_ms", 0):.2f} ms   kayip %{pct:.2f}'
+                segs.append(('info', '\n'.join(lines) + '\n'))
+                self.lbl_rate.setText(net.fmt_rate(r['recv_bps']))
+                self.lbl_sum.setText(summ)
+            elif k == 'end':
+                ended = True
+        if segs:
+            self.log.write_segments(segs)
+        if ended:
+            self.job = None
+            self.btn.setText('Baslat')
+            self.btn.setEnabled(True)
+            self.set_running(False)
+
+    def shutdown(self):
+        if self.job:
+            self.job.stop()
+
+
+NET_TYPES = [NetConfigTab, PingTab, ScanTab, IperfTab]
+
+
 SESSION_TYPES = [SerialSession, TcpClientSession, TcpServerSession, UdpSession, MonitorSession]
+ALL_TYPES = SESSION_TYPES + NET_TYPES
 
 
 # =========================================================================== ana pencere
@@ -1338,13 +2480,34 @@ class MainWindow(W.QMainWindow):
         self.ports = core.list_serial_ports()
         self._port_keys = [p.key() for p in self.ports]
 
+        self.ifaces = []
         tb = self.addToolBar('Yeni')
         tb.setMovable(False)
-        tb.addWidget(W.QLabel('  Yeni sekme: '))
-        for cls in SESSION_TYPES:
-            act = tb.addAction('+ ' + cls.TITLE)
-            act.triggered.connect(lambda _=False, c=cls: self.add_session(c))
+        newbtn = W.QToolButton()
+        newbtn.setText('  + Yeni sekme  ')
+        newbtn.setPopupMode(qenum(W.QToolButton, 'ToolButtonPopupMode.InstantPopup'))
+        nm = W.QMenu(newbtn)
+        for i, cls in enumerate(ALL_TYPES):
+            if i == len(SESSION_TYPES):
+                nm.addSeparator()
+            nm.addAction(cls.TITLE).triggered.connect(lambda _=False, c=cls: self.add_session(c))
+        newbtn.setMenu(nm)
+        tb.addWidget(newbtn)
         tb.addSeparator()
+        for cls in (SerialSession, TcpClientSession, PingTab, IperfTab):
+            tb.addAction('+ ' + cls.TITLE).triggered.connect(lambda _=False, c=cls: self.add_session(c))
+        tb.addSeparator()
+        setb = W.QToolButton()
+        setb.setText('  Ayarlar  ')
+        setb.setPopupMode(qenum(W.QToolButton, 'ToolButtonPopupMode.InstantPopup'))
+        sm = W.QMenu(setb)
+        self.act_admin = sm.addAction('Acilista yonetici izni iste (IP degistirme, seri port izni)')
+        self.act_admin.setCheckable(True)
+        self.act_admin.setChecked(str(self.settings.value('ask_admin', 'true')).lower() in ('1', 'true'))
+        self.act_admin.toggled.connect(lambda v: self.settings.setValue('ask_admin', v))
+        sm.addAction('Yonetici iznini simdi iste').triggered.connect(self.request_admin)
+        setb.setMenu(sm)
+        tb.addWidget(setb)
         tb.addAction('Hakkinda').triggered.connect(self.about)
 
         self.tabs = W.QTabWidget()
@@ -1354,11 +2517,13 @@ class MainWindow(W.QMainWindow):
         self.tabs.tabCloseRequested.connect(self.close_tab)
         self.setCentralWidget(self.tabs)
 
-        for cls in SESSION_TYPES:
+        for cls in ALL_TYPES:
             self.add_session(cls, focus=False)
         self.tabs.setCurrentIndex(0)
 
         self.statusBar().showMessage(f'{len(self.ports)} seri port bulundu   |   Qt: {QT_API}', 5000)
+        self.lbl_admin = W.QLabel()
+        self.statusBar().addPermanentWidget(self.lbl_admin)
         self.lbl_ports = W.QLabel()
         self.statusBar().addPermanentWidget(self.lbl_ports)
         self._update_port_label()
@@ -1429,8 +2594,8 @@ class MainWindow(W.QMainWindow):
 
     def close_tab(self, idx):
         w = self.tabs.widget(idx)
-        if w.transport is not None:
-            r = W.QMessageBox.question(self, 'Sekmeyi kapat', 'Baglanti acik. Kapatilsin mi?')
+        if w.transport is not None or getattr(w, 'is_busy', lambda: False)():
+            r = W.QMessageBox.question(self, 'Sekmeyi kapat', 'Baglanti / test calisiyor. Kapatilsin mi?')
             if r != qenum(W.QMessageBox, 'StandardButton.Yes'):
                 return
         w.shutdown()
@@ -1445,6 +2610,71 @@ class MainWindow(W.QMainWindow):
         self.tabs.tabBar().setTabTextColor(idx, QtGui.QColor('#2da44e') if s.connected
                                            else self.palette().color(qenum(QtGui.QPalette, 'ColorRole.WindowText')))
 
+    # -- ag araclari arasi baglantilar
+    def ifaces_changed(self, ifaces):
+        self.ifaces = ifaces
+        for i in range(self.tabs.count()):
+            w = self.tabs.widget(i)
+            if isinstance(w, ScanTab):
+                w.ifaces_changed(ifaces)
+
+    def _first(self, cls):
+        for i in range(self.tabs.count()):
+            if isinstance(self.tabs.widget(i), cls):
+                self.tabs.setCurrentIndex(i)
+                return self.tabs.widget(i)
+        return self.add_session(cls)
+
+    def send_to_ping(self, ip):
+        self._first(PingTab).add_host(ip)
+
+    def send_to_iperf(self, ip):
+        t = self._first(IperfTab)
+        t.rb_client.setChecked(True)
+        t.ed_host.setText(ip)
+
+    def send_to_tcp(self, ip):
+        self._first(TcpClientSession).host.setText(ip)
+
+    # -- yonetici izni
+    def admin_state(self):
+        if net.is_admin():
+            return True, '<span style="color:#2da44e">🔓 Yonetici: aktif</span>'
+        h = net.PrivHelper.instance
+        if h is not None and h.alive:
+            return True, '<span style="color:#2da44e">🔓 Yonetici izni: verildi</span>'
+        return False, '<span style="color:#888">🔒 Yonetici izni yok (IP degisikliginde sorulur)</span>'
+
+    def _admin_changed(self):
+        self.lbl_admin.setText(self.admin_state()[1] + '  ')
+        for i in range(self.tabs.count()):
+            w = self.tabs.widget(i)
+            if isinstance(w, NetConfigTab):
+                w.update_admin_label()
+
+    def request_admin(self, *_):
+        if net.is_admin():
+            self._admin_changed()
+            return
+        if net.IS_WIN:
+            r = W.QMessageBox.question(self, 'Yonetici izni', 'BYSTerm yonetici olarak yeniden baslatilsin mi?\n'
+                                       '(Acik baglantilar kapanir.)')
+            if r == qenum(W.QMessageBox, 'StandardButton.Yes') and net.relaunch_as_admin():
+                self.close()
+            return
+        h = net.PrivHelper.get()
+        if h.alive:
+            self._admin_changed()
+            return
+        self.lbl_admin.setText('🔑 Yonetici izni isteniyor...  ')
+
+        def done(ok, err):
+            if not ok:
+                self.statusBar().showMessage(f'Yonetici izni verilmedi ({h.err or err}). '
+                                             f'IP degistirirken tekrar sorulacak.', 8000)
+            self._admin_changed()
+        _bg(self, h.start, done)
+
     def about(self):
         W.QMessageBox.about(
             self, f'{APP_NAME} {APP_VERSION}',
@@ -1453,6 +2683,8 @@ class MainWindow(W.QMainWindow):
             f'Ayarlar: {self.settings.fileName()}')
 
     def closeEvent(self, ev):
+        if net.PrivHelper.instance is not None:
+            net.PrivHelper.instance.close()
         self._scan_stop.set()
         self._scan_now.set()
         self.settings.setValue('geometry', self.saveGeometry())
@@ -1486,7 +2718,7 @@ def main():
         def _early():
             print(f'{APP_NAME} SELFTEST TIMEOUT (baslangic asamasi)', flush=True)
             os._exit(4)
-        _t = threading.Timer(60, _early)
+        _t = threading.Timer(90, _early)
         _t.daemon = True
         _t.start()
         _st(f'basladi (Python {sys.version.split()[0]}, {QT_API})')
@@ -1504,6 +2736,13 @@ def main():
         os.environ.setdefault('QT_XCB_GL_INTEGRATION', 'none')
     app = W.QApplication(sys.argv)
     _st('QApplication hazir')
+    selftest = '--selftest' in sys.argv
+    ask_admin = str(QtCore.QSettings(APP_NAME, APP_NAME).value('ask_admin', 'true')).lower() in ('1', 'true')
+    if (core.IS_WIN and ask_admin and not selftest and not net.is_admin()
+            and '--elevated' not in sys.argv):
+        # acilista BIR KEZ UAC: onaylanirsa yonetici olarak yeniden baslar, reddedilirse normal devam
+        if net.relaunch_as_admin():
+            sys.exit(0)
     app.setApplicationName(APP_NAME)
     app.setStyle('Fusion')
     icon = resource('icon.png')
@@ -1512,8 +2751,11 @@ def main():
     win = MainWindow()
     _st('ana pencere olustu')
     win.show()
-    if '--selftest' in sys.argv:
+    win._admin_changed()
+    if selftest:
         QtCore.QTimer.singleShot(300, lambda: _selftest(win))
+    elif ask_admin and not core.IS_WIN and not net.is_admin():
+        QtCore.QTimer.singleShot(400, win.request_admin)
     sys.exit(qexec(app))
 
 
@@ -1526,7 +2768,7 @@ def _selftest(win):
     def watchdog():   # olay dongusu kilitlense bile surec mutlaka biter
         print(f'{APP_NAME} SELFTEST TIMEOUT (adim: {names[min(step["n"], 2)]})', flush=True)
         os._exit(3)
-    wd = threading.Timer(30, watchdog)
+    wd = threading.Timer(60, watchdog)
     wd.daemon = True
     wd.start()
     print(f'{APP_NAME} selftest: pencere acildi', flush=True)
@@ -1551,17 +2793,47 @@ def _selftest(win):
         if step['n'] == 2 and srv.rx_total >= 10:
             ok = True
         if ok or time.monotonic() - t0 > 10:
-            wd.cancel()
-            ports = len(win.ports)
-            print(f'{APP_NAME} {APP_VERSION} SELFTEST {"OK" if ok else "FAIL"} '
-                  f'(Qt {QtCore.qVersion()} / {QT_API}, Python {sys.version.split()[0]}, '
-                  f'{sys.platform}, seri port: {ports})', flush=True)
-            win.close()
-            W.QApplication.instance().exit(0 if ok else 1)
-            threading.Timer(5, lambda: os._exit(0 if ok else 1)).start()   # kapanis takilirsa
+            if not ok:
+                return finish(False, 'TCP alisverisi basarisiz')
+            print(f'{APP_NAME} selftest: TCP OK, ag testleri...', flush=True)
+            _bg(win, _net_selftest, lambda r, e: finish(*(r if r else (False, f'ag testi hatasi: {e}'))))
             return
         QtCore.QTimer.singleShot(50, poll)
+    def finish(ok, detail):
+        wd.cancel()
+        ports = len(win.ports)
+        print(f'{APP_NAME} {APP_VERSION} SELFTEST {"OK" if ok else "FAIL"} '
+              f'(Qt {QtCore.qVersion()} / {QT_API}, Python {sys.version.split()[0]}, '
+              f'{sys.platform}, seri port: {ports}) {detail}', flush=True)
+        win.close()
+        W.QApplication.instance().exit(0 if ok else 1)
+        threading.Timer(5, lambda: os._exit(0 if ok else 1)).start()   # kapanis takilirsa
     poll()
+
+
+def _net_selftest():
+    """Ag katmani bu sistemde calisiyor mu: arayuz listesi, ping, iperf3 dongu testi."""
+    lst = net.list_interfaces(include_virtual=True)
+    p = net.Pinger()
+    r = p.ping('127.0.0.1', 2000)
+    backend = p.backend
+    p.close()
+    srv = net.IperfServer(0, bind='127.0.0.1', once=True)
+    srv.start()
+    c = net.IperfClient('127.0.0.1', srv.port, duration=1)
+    c.start()
+    t0 = time.monotonic()
+    while c.running and time.monotonic() - t0 < 15:
+        time.sleep(0.05)
+    res = [e[2] for e in list(c.events) if e[0] == 'result']
+    srv.stop()
+    rate = res[0]['recv_bps'] if res else 0
+    detail = (f'| ag: {len(lst)} arayuz, ping={"OK" if r.ok else "YOK"}({backend}'
+              f'{", %.2f ms" % r.rtt if r.ok else ""}), iperf={net.fmt_rate(rate)}')
+    ok = len(lst) > 0 and r.ok and rate > 0
+    if not lst:
+        detail += ' [arayuz listesi BOS]'
+    return ok, detail
 
 
 if __name__ == '__main__':

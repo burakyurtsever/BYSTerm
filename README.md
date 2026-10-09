@@ -13,6 +13,10 @@ SSH/telnet yok, gereksiz menü yok: aç, portu seç, bak.
 | **TCP Sunucu** | Dinle, bağlı istemcileri listele, **hepsine veya seçilene** gönder, istemciyi at |
 | **UDP** | Yerel porttan dinle, hedefe gönder, gelen paketin kaynağını göster, "son gönderene yanıtla", broadcast |
 | **Seri İzleme** | **Başka bir uygulamanın** seri trafiğini iki yönlü izle (Eltima gibi) — aşağıya bakın |
+| **Ağ Ayarları** | PC'deki tüm ağ kartlarını listele (Ethernet 1/2/3, Wi-Fi: bağlantı, hız, IP/maske, gateway, DNS, DHCP/statik, MAC). Seçtiğin kartın **IP / maske / gateway / DNS**'ini değiştir veya DHCP'ye al. **Ek IP ekle**: mevcut IP (ve internet) bozulmadan karta cihazın alt ağından ikinci bir IP. **Otomatik IP**: cihazın IP'sini yaz, o ağda boş IP bulunsun. **Profiller**: "Jetson ağı" gibi ayarları kaydet, tek tıkla yükle |
+| **Ping** | Sürekli ping, aynı anda birden fazla hedef: kayıp %, son/ort/min/max/jitter, canlı grafik. Cihaz **cevap vermeye başlayınca / kesilince** satır vurgulanır (isteğe bağlı bip) |
+| **IP Tarama** | Alt ağı tara: cevap veren cihazların IP, süre, MAC, host adı ve TTL'den tahmini sistemi. Sağ tık → Ping'e ekle / iPerf / TCP hedefi yap |
+| **iPerf** | **iperf3 uyumlu** hız testi, istemci ve sunucu: TCP/UDP, ters yön (-R), paralel akış (-P), hız sınırı (-b), kaynak kart seçimi. Cihazdaki gerçek `iperf3 -s` / `iperf3 -c` ile ya da iki BYSTerm arasında çalışır. Canlı Mbit/s grafiği, UDP'de jitter ve kayıp |
 
 Her sekmede: **ASCII / HEX / HEX+ASCII** görünüm, zaman damgası, renkli RX/TX, duraklat,
 temizle, ekranı kaydet, **kayıt** (`.log` = zaman damgalı metin, `.bin` = ham RX baytları),
@@ -42,7 +46,26 @@ otomatik olarak Ubuntu 18.04 / 20.04 / 22.04 / 24.04 üzerinde, Windows'ta ve ma
 açılıp kendi kendini test eder (`--selftest`).
 
 **Çalıştığını doğrulamak için:** `BYSTerm --selftest`. Pencere açılır, kendi içinde
-TCP sunucu↔istemci testi yapar ve `SELFTEST OK` yazıp kapanır.
+TCP sunucu↔istemci, ağ kartı listeleme, ping ve iperf3 testi yapar ve `SELFTEST OK` yazıp kapanır.
+
+## Yönetici izni (IP değiştirme, seri port izni)
+
+IP değiştirmek her işletim sisteminde yönetici izni ister. BYSTerm bunu **açılışta bir kez** ister,
+sonra sormadan çalışır:
+
+* **Windows:** açılışta UAC sorusu → onaylarsanız BYSTerm yönetici olarak yeniden başlar.
+* **Linux / Jetson:** açılışta şifre penceresi (pkexec) → küçük bir yardımcı süreç root olarak
+  çalışır ve **yalnızca** ağ komutlarını (`nmcli`, `ip`, `dhclient`…) ve seri port iznini çalıştırır.
+  Bir seri port "erişim reddedildi" derse izin anında verilir (kullanıcınız `dialout` grubuna da eklenir)
+  ve port yeniden açılır.
+* **macOS:** açılışta yönetici şifresi, aynı yardımcı.
+
+Reddederseniz uygulama normal çalışır; IP değiştirirken tekrar sorulur. Açılıştaki soruyu
+**Ayarlar → Açılışta yönetici izni iste** ile kapatabilirsiniz. Her ağ değişikliğinden önce
+çalıştırılacak komutlar size gösterilir ve onay istenir.
+
+> Uyarı: Uzaktan bağlandığınız kartın IP'sini değiştirirseniz bağlantı kopar. Cihaza ulaşmak için
+> çoğu zaman **"Ek IP olarak ekle"** daha güvenlidir.
 
 ## Yüksek veri hızında donmaz
 
@@ -117,6 +140,7 @@ test eder ve Releases'a koyar.
 |---|---|
 | `src/bysterm.py` | Arayüz (Qt: PySide6 → PyQt5 → PySide2 sırasıyla denenir) |
 | `src/bysterm_core.py` | Qt'siz çekirdek: transport'lar, port tarama, biçimleyici, köprü |
+| `src/bysterm_net.py` | Qt'siz ağ katmanı: arayüz okuma/yazma, ping, IP tarama, iperf3 protokolü, yönetici yardımcısı |
 | `src/test_bysterm_core.py` | Çekirdek testleri |
 | `ci/` | Paketleme (PyInstaller), Linux Docker derlemesi, selftest betikleri |
 | `.github/workflows/release.yml` | Otomatik derleme + Release |
