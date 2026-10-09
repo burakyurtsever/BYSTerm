@@ -1,12 +1,20 @@
 name: Build & Release
 
-# v* etiketi push'lanınca (ör. git tag v1.0.0 && git push origin v1.0.0) tüm platformlar
-# derlenir, her biri kendi selftest'inden geçer ve GitHub Releases'a yüklenir.
-# Actions sekmesinden "Run workflow" ile elle de çalıştırılabilir (sadece artifact üretir).
+# Yeni sürüm iki yoldan çıkar:
+#  1) GitHub > Actions > "Build & Release" > Run workflow > sürüm (ör. 1.0.1) yaz > Run
+#     (etiketi workflow kendisi oluşturur)
+#  2) git tag v1.0.1 && git push origin v1.0.1
+# Tüm platformlar derlenir, her biri kendi selftest'inden geçer, sonra Releases'a yüklenir.
+# Sürüm boş bırakılırsa sadece derlenir/test edilir (Release oluşmaz).
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Sürüm (ör. 1.0.1). Boş = sadece derle/test et'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -80,7 +88,7 @@ jobs:
 
   release:
     name: GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
     needs: [linux, windows, macos]
     runs-on: ubuntu-latest
     steps:
@@ -91,6 +99,9 @@ jobs:
       - run: ls -la release
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', inputs.version) }}
+          name: BYSTerm ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', inputs.version) }}
+          target_commitish: ${{ github.sha }}
           files: release/*
           generate_release_notes: true
           body: |

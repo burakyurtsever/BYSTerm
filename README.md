@@ -110,7 +110,7 @@ Tek dosya paket: `pip install pyinstaller` → `python3 ci/build.py` → `releas
 Linux için tüm sistemlerde çalışan paket: `docker run --rm -v "$PWD":/src -w /src ubuntu:18.04 bash ci/build_linux_docker.sh`
 
 **Yeni sürüm yayınlamak:** `src/bysterm.py` içindeki `APP_VERSION`'ı artırın, sonra
-`git tag v1.0.1 && git push origin v1.0.1`. GitHub Actions bütün platformları derler,
+GitHub → **Actions** → *Build & Release* → **Run workflow** → sürümü yazın (ör. `1.0.1`). (Veya `git tag v1.0.1 && git push origin v1.0.1`.) GitHub Actions bütün platformları derler,
 test eder ve Releases'a koyar.
 
 | Dosya | İçerik |
