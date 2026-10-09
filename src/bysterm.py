@@ -83,7 +83,7 @@ from bysterm_i18n import tr, set_lang, LANGS   # noqa: E402
 from bysterm_core import RX, TX  # noqa: E402
 
 APP_NAME = 'BYSTerm'
-APP_VERSION = '1.2.0'
+APP_VERSION = '1.3.0'
 
 Qt = QtCore.Qt
 W = QtWidgets
@@ -107,11 +107,24 @@ DISPLAY_BUDGET = {'ascii': 24 * 1024, 'hex': 12 * 1024, 'dump': 8 * 1024}
 DRAIN_MS = 40
 MAX_LINES = 20000
 
-COLORS = {      # MutlakEncoder "ATOLYE" paleti: grafit zemin, kanal renkleri R=yesil / L=mavi
+COLORS = {      # KOYU tema terminal renkleri: grafit zemin, kanal renkleri RX=yesil / TX=mavi
     'bg': '#101214', 'fg': '#EDEEEF',
     RX: '#3DDC84', TX: '#4FA8FF', 'hdr': '#5C656D',
     'info': '#F2C94C', 'warn': '#F5B841', 'error': '#F0555B',
 }
+_COLORS_LIGHT = {    # ACIK tema terminal renkleri (beyaz zeminde okunakli)
+    'bg': '#ffffff', 'fg': '#1d2125',
+    RX: '#1A7F37', TX: '#0969DA', 'hdr': '#6e7781',
+    'info': '#9A6700', 'warn': '#BC4C00', 'error': '#CF222E',
+}
+
+
+def term_colors():
+    """Mevcut temaya gore terminal/grafik renkleri."""
+    try:
+        return COLORS if THEME['dark'] else _COLORS_LIGHT
+    except NameError:
+        return COLORS
 
 
 _ips_cache = None
@@ -169,17 +182,24 @@ class Terminal(W.QPlainTextEdit):
         f = QtGui.QFontDatabase.systemFont(qenum(QtGui.QFontDatabase, 'SystemFont.FixedFont'))
         f.setPointSize(max(9, f.pointSize()))
         self.setFont(f)
-        self.setStyleSheet(f'QPlainTextEdit {{ background:{COLORS["bg"]}; color:{COLORS["fg"]};'
-                           f' border:1px solid #30363d; }}')
         self.formats = {}
-        for k, c in COLORS.items():
+        self._plain = QtGui.QTextCharFormat()
+        self.apply_palette()
+
+    def apply_palette(self):
+        c = term_colors()
+        border = '#30373E' if (THEME['dark'] if 'THEME' in globals() else True) else '#c5ccd2'
+        self.setStyleSheet(f'QPlainTextEdit {{ background:{c["bg"]}; color:{c["fg"]};'
+                           f' border:1px solid {border}; }}')
+        self.formats = {}
+        for k, col in c.items():
             if k in ('bg', 'fg'):
                 continue
             tf = QtGui.QTextCharFormat()
-            tf.setForeground(QtGui.QColor(c))
+            tf.setForeground(QtGui.QColor(col))
             self.formats[k] = tf
         self._plain = QtGui.QTextCharFormat()
-        self._plain.setForeground(QtGui.QColor(COLORS['fg']))
+        self._plain.setForeground(QtGui.QColor(c['fg']))
 
     def write_segments(self, segs, autoscroll=True):
         if not segs:
@@ -1689,21 +1709,22 @@ class LineGraph(W.QWidget):
         p = QtGui.QPainter(self)
         p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
         r = self.rect()
-        p.fillRect(r, QtGui.QColor(COLORS['bg']))
+        p.fillRect(r, QtGui.QColor(term_colors()['bg']))
         L, T, R, B = 52, 18, r.width() - 8, r.height() - 8
         vals = list(self.vals)
         good = [v for v in vals if v is not None]
         top = max(good) * 1.2 if good else 1.0
         top = top or 1.0
-        p.setPen(QtGui.QPen(QtGui.QColor('#30373E'), 1))
+        grid = '#30373E' if THEME['dark'] else '#d8dde2'
+        p.setPen(QtGui.QPen(QtGui.QColor(grid), 1))
         f = p.font()
         f.setPointSize(max(7, f.pointSize() - 2))
         p.setFont(f)
         for i in range(5):
             y = T + (B - T) * i / 4.0
-            p.setPen(QtGui.QPen(QtGui.QColor('#30373E'), 1))
+            p.setPen(QtGui.QPen(QtGui.QColor(grid), 1))
             p.drawLine(QtCore.QPointF(L, y), QtCore.QPointF(R, y))
-            p.setPen(QtGui.QColor(COLORS['hdr']))
+            p.setPen(QtGui.QColor(term_colors()['hdr']))
             p.drawText(QtCore.QRectF(0, y - 8, L - 4, 16), qenum(Qt, 'AlignmentFlag.AlignRight') |
                        qenum(Qt, 'AlignmentFlag.AlignVCenter'), self.fmt.format(top * (4 - i) / 4.0))
         n = min(self.vals.maxlen, max(len(vals), 20))   # az noktayla da genis gorunsun
@@ -1717,7 +1738,7 @@ class LineGraph(W.QWidget):
                     p.setPen(QtGui.QPen(QtGui.QColor(self.color), 2))
                     p.drawPolyline(QtGui.QPolygonF(pts))
                 pts = []
-                p.setPen(QtGui.QPen(QtGui.QColor(COLORS['error']), 2))
+                p.setPen(QtGui.QPen(QtGui.QColor(term_colors()['error']), 2))
                 p.drawLine(QtCore.QPointF(x, B), QtCore.QPointF(x, B - 10))
                 continue
             pts.append(QtCore.QPointF(x, B - (B - T) * v / top))
@@ -1727,7 +1748,7 @@ class LineGraph(W.QWidget):
         elif len(pts) == 1:
             p.setBrush(QtGui.QColor(self.color))
             p.drawEllipse(pts[0], 2, 2)
-        p.setPen(QtGui.QColor(COLORS['fg']))
+        p.setPen(QtGui.QColor(term_colors()['fg']))
         last = next((v for v in reversed(vals) if v is not None), None)
         txt = self.title + ('   son: ' + self.fmt.format(last) + ' ' + self.unit if last is not None else '')
         p.drawText(QtCore.QRectF(L, 1, R - L, 16), qenum(Qt, 'AlignmentFlag.AlignLeft'), txt)
@@ -2363,7 +2384,7 @@ class PingTab(ToolTab):
             if it:
                 it.setText(v)
                 if c == 2:
-                    it.setForeground(QtGui.QBrush(QtGui.QColor('#3DDC84' if r.ok else COLORS['error'])))
+                    it.setForeground(QtGui.QBrush(QtGui.QColor(term_colors()[RX] if r.ok else term_colors()['error'])))
         if changed or first:
             if changed or not r.ok:
                 txt = f'{h}: ▲ CEVAP VERMEYE BASLADI' if r.ok else f'{h}: ▼ CEVAP KESILDI ({r.err})'
@@ -2644,14 +2665,14 @@ class IperfTab(ToolTab):
         f.setPointSize(f.pointSize() + 14)
         f.setBold(True)
         self.lbl_rate.setFont(f)
-        self.lbl_rate.setStyleSheet('color:#2DD4BF')
+        self.lbl_rate.setStyleSheet(f'color:{ACC}')
         self.lbl_sum = W.QLabel('')
         self.lbl_sum.setStyleSheet('color:#888')
         big.addWidget(self.lbl_rate)
         big.addSpacing(20)
         big.addWidget(self.lbl_sum, 1)
         root.addLayout(big)
-        self.graph = LineGraph('Mbit/s', '#2DD4BF', fmt='{:.0f}')
+        self.graph = LineGraph('Mbit/s', ACC, fmt='{:.0f}')
         self.graph.setMinimumHeight(150)
         root.addWidget(self.graph)
         self.log = Terminal()
@@ -2781,16 +2802,16 @@ ALL_TYPES = SESSION_TYPES + NET_TYPES
 BRAND1, BRAND2 = '#FFB547', '#FF5F6D'      # BYS aile simgesinde BYSTerm'in renk cifti
 THEME = {'dark': True}
 
-ACC, ACC2 = '#2DD4BF', '#14B8A6'          # ATOLYE turkuaz vurgu (MutlakEncoder araclariyla ayni aile)
+ACC, ACC2 = '#FFB547', '#FF5F6D'          # logo ile ayni amber->mercan vurgu (BYS ailesi)
 _DARK = {      # ATOLYE: notr grafit
     'win': '#141719', 'panel': '#101214', 'base': '#1A1E22', 'alt': '#171B1F', 'btn': '#232930',
     'border': '#30373E', 'text': '#EDEEEF', 'muted': '#98A2AB', 'hover': '#2A323A', 'acc': ACC,
-    'accdark': ACC2, 'sel': '#14B8A6', 'pane_on': '#123430', 'pane_off': '#1A1E22',
+    'accdark': ACC2, 'sel': '#C8803A', 'pane_on': '#2A1E12', 'pane_off': '#1A1E22',
 }
 _LIGHT = {
     'win': '#f3f5f6', 'panel': '#e8ecee', 'base': '#ffffff', 'alt': '#f5f7f8', 'btn': '#ffffff',
-    'border': '#c5ccd2', 'text': '#1d2125', 'muted': '#5f6a73', 'hover': '#e2e8ec', 'acc': '#0F9488',
-    'accdark': '#0B7A70', 'sel': '#0F9488', 'pane_on': '#d5f2ee', 'pane_off': '#e8ecee',
+    'border': '#c5ccd2', 'text': '#1d2125', 'muted': '#5f6a73', 'hover': '#e2e8ec', 'acc': '#D98B2B',
+    'accdark': '#E0603A', 'sel': '#E89A4A', 'pane_on': '#fbe9d6', 'pane_off': '#e8ecee',
 }
 
 
@@ -2844,9 +2865,9 @@ def apply_theme(app, dark=True):
         QPushButton:pressed {{ background: {c['border']}; }}
         QPushButton:disabled {{ color: {c['muted']}; border-color: {c['border']}; }}
         QPushButton:checked {{ background: #2D1518; border-color: #F0555B; color: #F0555B; }}
-        QPushButton#primary {{ color: #04130d; font-weight: bold; border: none;
+        QPushButton#primary {{ color: #2A1705; font-weight: bold; border: none;
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {c['acc']}, stop:1 {c['accdark']}); }}
-        QPushButton#primary:hover {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #5EEAD4, stop:1 {c['acc']}); }}
+        QPushButton#primary:hover {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FFC56E, stop:1 #FF7A86); }}
         QPushButton#primary:disabled {{ background: {c['border']}; color: {c['muted']}; }}
         QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ background: {c['base']}; border: 1px solid {c['border']};
             border-radius: 4px; padding: 2px 6px; min-height: 20px; }}
@@ -2883,7 +2904,7 @@ def apply_theme(app, dark=True):
         QMenu::item:selected {{ background: {c['sel']}; color: white; }}
         QProgressBar {{ border: 1px solid {c['border']}; border-radius: 4px; text-align: center; background: {c['base']}; }}
         QProgressBar::chunk {{ border-radius: 3px;
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c['acc']}, stop:1 #4FA8FF); }}
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c['acc']}, stop:1 {c['accdark']}); }}
         #sidebar {{ background: {c['panel']}; }}
         #sidebarBrand {{ color: {c['text']}; }}
     """)
@@ -2970,7 +2991,7 @@ def tool_icon(kind, size=18):
     p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
     gr = QtGui.QLinearGradient(0, 0, size, size)
     gr.setColorAt(0, QtGui.QColor(ACC))
-    gr.setColorAt(1, QtGui.QColor('#4FA8FF'))
+    gr.setColorAt(1, QtGui.QColor(ACC2))
     pen = QtGui.QPen(QtGui.QBrush(gr), 1.6)
     p.setPen(pen)
     s = float(size)
@@ -3368,17 +3389,23 @@ class Pane(W.QFrame):
         super().__init__()
         self.ws = ws
         self.session = None
+        self._drop_zone = None
         self.setObjectName('pane')
+        self.setAcceptDrops(True)
         lay = W.QVBoxLayout(self)
         lay.setContentsMargins(1, 1, 1, 1)
         lay.setSpacing(0)
         self.header = W.QWidget()
         self.header.setObjectName('paneHeader')
+        self.header.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.OpenHandCursor')))
+        self.header.installEventFilter(self)
+        self._press_pos = None
         hl = W.QHBoxLayout(self.header)
         hl.setContentsMargins(8, 2, 4, 2)
         hl.setSpacing(2)
         self.title = W.QLabel('')
         self.title.setObjectName('paneTitle')
+        self.title.setToolTip('Başlığı tutup sürükleyerek bölmeyi taşıyın')
         hl.addWidget(self.title, 1)
         self.btns = {}
         for key, tip, fn in (('hsplit', 'Yana bol  (Ctrl+Shift+E)', lambda: ws.split_pane(self, 'h')),
@@ -3438,11 +3465,106 @@ class Pane(W.QFrame):
 
     def set_active(self, on):
         self.setProperty('active', 'true' if on else 'false')
+        dark = THEME['dark'] if 'THEME' in globals() else True
+        on_hdr, off_hdr = ('#2A1E12', '#1A1E22') if dark else ('#fbe9d6', '#e9ebef')
+        on_tx, off_tx = ('#EDEEEF', '#98A2AB') if dark else ('#1d2125', '#5f6a73')
+        off_bd = '#30373E' if dark else '#c5ccd2'
         self.setStyleSheet(
             '#pane { border: 1px solid %s; }'
             '#paneHeader { background: %s; }'
             '#paneTitle { color: %s; }' % (
-                (ACC, '#123430', '#EDEEEF') if on else ('#30373E', '#1A1E22', '#98A2AB')))
+                (ACC, on_hdr, on_tx) if on else (off_bd, off_hdr, off_tx)))
+
+    # -- surukle-birak ile bolme tasima
+    MIME = 'application/x-bysterm-pane'
+
+    def eventFilter(self, obj, ev):
+        if obj is self.header:
+            et = ev.type()
+            if et == qenum(QtCore.QEvent, 'Type.MouseButtonPress') and ev.button() == qenum(Qt, 'MouseButton.LeftButton'):
+                self._press_pos = ev.pos()
+                self.ws.set_active(self)
+            elif et == qenum(QtCore.QEvent, 'Type.MouseMove') and self._press_pos is not None:
+                if (ev.pos() - self._press_pos).manhattanLength() > 8:
+                    self._start_drag()
+                    self._press_pos = None
+            elif et == qenum(QtCore.QEvent, 'Type.MouseButtonRelease'):
+                self._press_pos = None
+        return False
+
+    def _start_drag(self):
+        if len(self.ws.panes()) < 2:
+            return
+        drag = QtGui.QDrag(self)
+        mime = QtCore.QMimeData()
+        mime.setData(self.MIME, b'1')
+        drag.setMimeData(mime)
+        pm = self.header.grab()
+        drag.setPixmap(pm)
+        drag.setHotSpot(QtCore.QPoint(20, pm.height() // 2))
+        Workspace.drag_src = self
+        self.header.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.ClosedHandCursor')))
+        drag.exec(qenum(Qt, 'DropAction.MoveAction')) if hasattr(drag, 'exec') else drag.exec_(qenum(Qt, 'DropAction.MoveAction'))
+        self.header.setCursor(QtGui.QCursor(qenum(Qt, 'CursorShape.OpenHandCursor')))
+
+    def _zone_at(self, pos):
+        w, h = self.width(), self.height()
+        x, y = pos.x(), pos.y()
+        # kenara olan goreli uzakliklar; en yakin kenar bolgeyi belirler, merkez genis birakilir
+        dl, dr, dt, db = x / w, (w - x) / w, y / h, (h - y) / h
+        m = min(dl, dr, dt, db)
+        if m > 0.5:
+            return 'center'
+        return {dl: 'left', dr: 'right', dt: 'top', db: 'bottom'}[m]
+
+    def dragEnterEvent(self, ev):
+        if ev.mimeData().hasFormat(self.MIME) and getattr(Workspace, 'drag_src', None) is not None:
+            ev.acceptProposedAction()
+
+    def dragMoveEvent(self, ev):
+        z = self._zone_at(ev.pos())
+        if z != self._drop_zone:
+            self._drop_zone = z
+            self.update()
+        ev.acceptProposedAction()
+
+    def dragLeaveEvent(self, ev):
+        self._drop_zone = None
+        self.update()
+
+    def dropEvent(self, ev):
+        z = self._drop_zone or self._zone_at(ev.pos())
+        self._drop_zone = None
+        self.update()
+        src = getattr(Workspace, 'drag_src', None)
+        Workspace.drag_src = None
+        if src is not None and src is not self:
+            self.ws.move_pane(src, self, z)
+        ev.acceptProposedAction()
+
+    def paintEvent(self, ev):
+        super().paintEvent(ev)
+        if not self._drop_zone:
+            return
+        p = QtGui.QPainter(self)
+        p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+        r = QtCore.QRectF(self.rect())
+        z = self._drop_zone
+        if z == 'left':
+            r.setWidth(r.width() / 2)
+        elif z == 'right':
+            r.setLeft(r.center().x())
+        elif z == 'top':
+            r.setHeight(r.height() / 2)
+        elif z == 'bottom':
+            r.setTop(r.center().y())
+        col = QtGui.QColor(ACC)
+        col.setAlpha(60)
+        p.fillRect(r, col)
+        pen = QtGui.QPen(QtGui.QColor(ACC), 2)
+        p.setPen(pen)
+        p.drawRect(r.adjusted(1, 1, -1, -1))
+        p.end()
 
 
 class Workspace(W.QWidget):
@@ -3541,6 +3663,57 @@ class Workspace(W.QWidget):
         new.show()
         self.set_active(new)
         return new
+
+    def _detach_pane(self, pane):
+        """Bolmeyi agactan cikar (oturumu YOK ETMEDEN). Agaci sadelestirir."""
+        par = pane.parentWidget()
+        pane.setParent(None)
+        pane.deleteLater()
+        if isinstance(par, W.QSplitter) and par.count() == 1:
+            child = par.widget(0)
+            self._replace(par, child)
+            par.deleteLater()
+
+    def move_pane(self, src, dst, side):
+        """src bolmesini dst'nin yanina (side: left/right/top/bottom/center) tasir."""
+        if src is dst or self.zoomed is not None:
+            return
+        sess = src.session
+        src.set_session(None)                 # oturumu koru (holder'a gider)
+        self._detach_pane(src)
+        if side in ('center', None):
+            side = 'right'
+        qo = qenum(Qt, 'Orientation.Horizontal' if side in ('left', 'right') else 'Orientation.Vertical')
+        after = side in ('right', 'bottom')
+        new = Pane(self, None)
+        par = dst.parentWidget()
+        if isinstance(par, W.QSplitter) and par.orientation() == qo:
+            idx = par.indexOf(dst) + (1 if after else 0)
+            sizes = par.sizes()
+            par.insertWidget(idx, new)
+            n = par.count()
+            tot = sum(sizes) or (par.width() if qo == qenum(Qt, 'Orientation.Horizontal') else par.height())
+            par.setSizes([max(1, tot // n)] * n)
+        else:
+            sp = W.QSplitter(qo)
+            sp.setChildrenCollapsible(False)
+            sp.setHandleWidth(5)
+            self._replace(dst, sp)
+            if after:
+                sp.addWidget(dst)
+                sp.addWidget(new)
+            else:
+                sp.addWidget(new)
+                sp.addWidget(dst)
+            tot = dst.width() if qo == qenum(Qt, 'Orientation.Horizontal') else dst.height()
+            sp.setSizes([max(1, tot // 2)] * 2)
+        if sess is not None:
+            sess.setParent(None)
+            new.set_session(sess)
+        new.show()
+        self.active = None
+        self.set_active(new)
+        self.main.workspace_changed()
 
     def close_pane(self, pane, ask=True):
         s = pane.session
@@ -3664,9 +3837,9 @@ class Sidebar(W.QWidget):
         self.setAttribute(qenum(Qt, 'WidgetAttribute.WA_StyledBackground'))
         self.setStyleSheet('QPushButton#tool { text-align: left; padding: 6px 8px; border: none; border-radius: 5px;'
                            ' background: transparent; }'
-                           'QPushButton#tool:hover { background: rgba(45,212,191,0.13); }'
+                           'QPushButton#tool:hover { background: rgba(255,181,71,0.14); }'
                            'QToolButton { border: none; border-radius: 4px; }'
-                           'QToolButton:hover { background: rgba(126,231,135,0.18); }'
+                           'QToolButton:hover { background: rgba(255,181,71,0.20); }'
                            'QLabel#grp { color: #8b929c; font-size: 10px; font-weight: bold; letter-spacing: 1px;'
                            ' padding: 10px 2px 3px 6px; }')
         brand = W.QHBoxLayout()
@@ -3706,59 +3879,14 @@ class Sidebar(W.QWidget):
                 row.addWidget(b, 1)
                 row.addWidget(plus)
                 lay.addLayout(row)
-        g = W.QLabel('ACIK PENCERELER')
-        g.setObjectName('grp')
-        lay.addWidget(g)
-        self.open = W.QListWidget()
-        self.open.setToolTip('Tikla: o pencereye gec (arka plandaysa aktif bolmede acilir)\nSag tik: yanina ac / kapat')
-        self.open.itemClicked.connect(self._clicked)
-        self.open.setContextMenuPolicy(qenum(Qt, 'ContextMenuPolicy.CustomContextMenu'))
-        self.open.customContextMenuRequested.connect(self._menu)
-        lay.addWidget(self.open, 1)
-        hint = W.QLabel('Ctrl+Shift+E yana bol · O alta bol\nX tam ekran · W kapat · Ctrl+Tab gec')
+        lay.addStretch(1)
+        hint = W.QLabel('Araç adı: boş/aktif bölmede aç\n+ : yanına yeni bölme\n\n'
+                        'Ctrl+Shift+E yana böl · O alta böl\nX tam ekran · W kapat · Ctrl+Tab geç')
         hint.setStyleSheet('color:#777; font-size: 10px;')
         lay.addWidget(hint)
 
     def refresh(self, sessions, ws):
-        self.open.clear()
-        for s in sessions:
-            vis = ws.pane_of(s) is not None
-            it = W.QListWidgetItem(('● ' if s.connected else '○ ') + s.tab_label() + ('' if vis else '   (arka planda)'))
-            it.setData(qenum(Qt, 'ItemDataRole.UserRole'), id(s))
-            col = '#3DDC84' if s.connected else (None if vis else '#888')
-            if col:
-                it.setForeground(QtGui.QBrush(QtGui.QColor(col)))
-            if ws.active is not None and ws.active.session is s:
-                f = it.font()
-                f.setBold(True)
-                it.setFont(f)
-            self.open.addItem(it)
-
-    def _session(self, item):
-        sid = item.data(qenum(Qt, 'ItemDataRole.UserRole'))
-        for s in self.main.sessions:
-            if id(s) == sid:
-                return s
-        return None
-
-    def _clicked(self, item):
-        s = self._session(item)
-        if s:
-            self.main.ws.show_session(s)
-
-    def _menu(self, pos):
-        item = self.open.itemAt(pos)
-        if not item:
-            return
-        s = self._session(item)
-        if not s:
-            return
-        m = W.QMenu(self)
-        m.addAction('Aktif bolmede goster').triggered.connect(lambda: self.main.ws.show_session(s))
-        m.addAction('Yanina ac').triggered.connect(lambda: self.main.ws.show_session(s, split=True))
-        m.addSeparator()
-        m.addAction('Kapat').triggered.connect(lambda: self.main.close_session(s))
-        qexec_at(m, self.open.viewport().mapToGlobal(pos))
+        pass        # acik pencereler listesi kaldirildi; paneller zaten sagda gorunuyor
 
 
 class MainWindow(W.QMainWindow):
@@ -3776,7 +3904,7 @@ class MainWindow(W.QMainWindow):
         tb = self.addToolBar('Ana')
         tb.setMovable(False)
         setb = W.QToolButton()
-        setb.setText('  Ayarlar  ')
+        setb.setText('  ' + tr('Settings') + '  ')
         setb.setPopupMode(qenum(W.QToolButton, 'ToolButtonPopupMode.InstantPopup'))
         sm = W.QMenu(setb)
         self.act_admin = sm.addAction('Acilista yonetici izni iste (IP degistirme, seri port izni)')
@@ -3786,7 +3914,7 @@ class MainWindow(W.QMainWindow):
         sm.addAction('Yonetici iznini simdi iste').triggered.connect(self.request_admin)
         sm.addSeparator()
         lm = sm.addMenu(tr('Language') + ' / Dil')
-        cur = self.settings.value('lang', 'en')
+        cur = self.settings.value('lang', 'tr')
         for code, label in LANGS:
             a = lm.addAction(label)
             a.setCheckable(True)
@@ -3942,17 +4070,21 @@ class MainWindow(W.QMainWindow):
         return s
 
     def open_tool(self, cls, split=False):
-        """Sol panel: adina tikla -> aktif bolmede (varsa mevcut olani goster); + -> yanina yeni."""
+        """Araç adına tıkla (split=False): o araç açıksa ona geç, değilse boş bölmede aç,
+        bölme doluysa yanına böl (hiçbir pencere gizlenmez). + (split=True): her zaman yanına böl."""
         if not split:
-            for s in self.sessions:
-                if type(s) is cls:
-                    if self.ws.active is not None and self.ws.active.session is s:
-                        return s
-                    self.ws.show_session(s)
+            for s in self.sessions:            # zaten açıksa ona geç
+                if type(s) is cls and self.ws.pane_of(s) is not None:
+                    self.ws.set_active(self.ws.pane_of(s))
                     return s
-            s = self.create_session(cls)
-            self.ws.show_session(s)
-            return s
+            tgt = self.ws.active or self.ws.panes()[0]
+            if tgt.session is None:            # boş bölme varsa oraya
+                s = self.create_session(cls)
+                tgt.set_session(s)
+                self.ws.set_active(tgt)
+                self.workspace_changed()
+                return s
+            # dolu: yanına böl
         s = self.create_session(cls)
         tgt = self.ws.active or self.ws.panes()[0]
         if tgt.session is None:
@@ -4079,6 +4211,13 @@ class MainWindow(W.QMainWindow):
     def set_theme(self, code):
         self.settings.setValue('theme', code)
         apply_theme(W.QApplication.instance(), code != 'light')
+        for w in W.QApplication.instance().allWidgets():
+            if isinstance(w, Terminal):
+                w.apply_palette()
+            elif isinstance(w, LineGraph):
+                w.update()
+            elif isinstance(w, Pane):
+                w.set_active(w is self.ws.active)
 
     def restart(self):
         cmd = net._self_cmd() + [a for a in sys.argv[1:] if a not in ('--elevated', '--updated')]
@@ -4165,7 +4304,7 @@ def main():
     selftest = '--selftest' in sys.argv
     cfg = QtCore.QSettings(APP_NAME, APP_NAME)
     on = lambda k, d='true': str(cfg.value(k, d)).lower() in ('1', 'true')   # noqa: E731
-    set_lang(str(cfg.value('lang', 'en')))
+    set_lang(str(cfg.value('lang', 'tr')))
     ask_admin = on('ask_admin')
     if (core.IS_WIN and ask_admin and not selftest and not net.is_admin()
             and '--elevated' not in sys.argv):
