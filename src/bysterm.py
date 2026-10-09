@@ -101,20 +101,46 @@ COLORS = {
 }
 
 
-def local_ips():
+_ips_cache = None
+_ips_lock = threading.Lock()
+
+
+def _ips_fast():
+    """Ad cozumlemesi YOK: varsayilan rotanin yerel IP'si (paket gonderilmez) — aninda."""
     ips = set()
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('10.255.255.255', 1))     # paket gonderilmez; sadece rota secilir
+        s.connect(('10.255.255.255', 1))
         ips.add(s.getsockname()[0])
         s.close()
     except OSError:
         pass
+    return ips
+
+
+def _ips_slow():
+    # getaddrinfo(hostname) bazi Mac'lerde / bozuk DNS'te ~30 sn bekleyebilir -> sadece arka planda
+    global _ips_cache
+    ips = set()
     try:
         for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
             ips.add(info[4][0])
     except OSError:
         pass
+    with _ips_lock:
+        _ips_cache = _ips_cache | ips
+
+
+def local_ips():
+    """Bu bilgisayarin IPv4 adresleri. Arayuzu ASLA bekletmez."""
+    global _ips_cache
+    with _ips_lock:
+        first = _ips_cache is None
+        if first:
+            _ips_cache = _ips_fast()
+        ips = set(_ips_cache)
+    if first:
+        threading.Thread(target=_ips_slow, daemon=True, name='local-ips').start()
     ips.discard('0.0.0.0')
     return sorted(ips, key=lambda x: (x.startswith('127.'), x))
 
@@ -1449,7 +1475,21 @@ def resource(name):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets', name)
 
 
+def _st(msg):
+    if '--selftest' in sys.argv:
+        print(f'{APP_NAME} selftest: {msg}', flush=True)
+
+
 def main():
+    if '--selftest' in sys.argv:
+        # en bastan bekci: baslangicta (Qt/pencere/port tarama) takilsa bile surec biter
+        def _early():
+            print(f'{APP_NAME} SELFTEST TIMEOUT (baslangic asamasi)', flush=True)
+            os._exit(4)
+        _t = threading.Timer(60, _early)
+        _t.daemon = True
+        _t.start()
+        _st(f'basladi (Python {sys.version.split()[0]}, {QT_API})')
     if hasattr(Qt, 'AA_EnableHighDpiScaling') and QT_API != 'PySide6':
         QtWidgets.QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     if core.IS_WIN:
@@ -1463,12 +1503,14 @@ def main():
         # sanal makine, uzak masaustu) her sistemde sorunsuz acilmayi saglar.
         os.environ.setdefault('QT_XCB_GL_INTEGRATION', 'none')
     app = W.QApplication(sys.argv)
+    _st('QApplication hazir')
     app.setApplicationName(APP_NAME)
     app.setStyle('Fusion')
     icon = resource('icon.png')
     if os.path.exists(icon):
         app.setWindowIcon(QtGui.QIcon(icon))
     win = MainWindow()
+    _st('ana pencere olustu')
     win.show()
     if '--selftest' in sys.argv:
         QtCore.QTimer.singleShot(300, lambda: _selftest(win))
