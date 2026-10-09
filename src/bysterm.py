@@ -107,10 +107,10 @@ DISPLAY_BUDGET = {'ascii': 24 * 1024, 'hex': 12 * 1024, 'dump': 8 * 1024}
 DRAIN_MS = 40
 MAX_LINES = 20000
 
-COLORS = {
-    'bg': '#1b1d23', 'fg': '#d6d6d6',
-    RX: '#7ee787', TX: '#79c0ff', 'hdr': '#7d8590',
-    'info': '#e3b341', 'warn': '#f0883e', 'error': '#ff7b72',
+COLORS = {      # MutlakEncoder "ATOLYE" paleti: grafit zemin, kanal renkleri R=yesil / L=mavi
+    'bg': '#101214', 'fg': '#EDEEEF',
+    RX: '#3DDC84', TX: '#4FA8FF', 'hdr': '#5C656D',
+    'info': '#F2C94C', 'warn': '#F5B841', 'error': '#F0555B',
 }
 
 
@@ -752,7 +752,7 @@ class Session(W.QWidget):
         self.connected = on
         self.btn_connect.setText(self.disconnect_text() if on else self.connect_text())
         if on:
-            self.lbl_state.setText(f'<b style="color:#2da44e">● ACIK</b>  {self.transport.description}')
+            self.lbl_state.setText(f'<b style="color:#3DDC84">● ACIK</b>  {self.transport.description}')
         else:
             self.lbl_state.setText('<span style="color:#888">○ Kapali</span>')
             self.set_inputs_enabled(True)
@@ -920,9 +920,9 @@ class Session(W.QWidget):
         lb = self.fmt.labels
         hb = core.human_bytes
         self.lbl_stats.setText(
-            f'<span style="color:#2da44e"><b>{lb[RX].rstrip(">")}</b></span> {hb(self.rx_total)} '
+            f'<span style="color:#3DDC84"><b>{lb[RX].rstrip(">")}</b></span> {hb(self.rx_total)} '
             f'({hb(self.rx_rate)}/s) &nbsp;&nbsp; '
-            f'<span style="color:#1f6feb"><b>{lb[TX].rstrip(">")}</b></span> {hb(self.tx_total)} '
+            f'<span style="color:#4FA8FF"><b>{lb[TX].rstrip(">")}</b></span> {hb(self.tx_total)} '
             f'({hb(self.tx_rate)}/s)' + (' &nbsp; <i>[kayit acik]</i>' if self.log_file else ''))
 
     def reset_counters(self):
@@ -1124,7 +1124,7 @@ class SerialSession(Session):
     def _set_leds(self, lines):
         for name, lb in self.leds.items():
             on = bool(lines and lines.get(name))
-            bg = '#2da44e' if on else ('#444' if lines is not None else '#2a2a2a')
+            bg = '#3DDC84' if on else ('#30373E' if lines is not None else '#1A1E22')
             fg = '#fff' if on else '#999'
             lb.setStyleSheet(f'QLabel {{ background:{bg}; color:{fg}; border-radius:3px; padding:1px 4px; }}')
 
@@ -1526,7 +1526,7 @@ class MonitorSession(Session):
 class LineGraph(W.QWidget):
     """Basit canli cizgi grafik (ping RTT / iperf hizi). None = kayip (kirmizi cizgi)."""
 
-    def __init__(self, unit='', color='#79c0ff', maxpts=120, fmt='{:.1f}', parent=None):
+    def __init__(self, unit='', color='#2DD4BF', maxpts=120, fmt='{:.1f}', parent=None):
         super().__init__(parent)
         self.unit, self.color, self.fmt = unit, color, fmt
         self.vals = collections.deque(maxlen=maxpts)
@@ -1551,13 +1551,13 @@ class LineGraph(W.QWidget):
         good = [v for v in vals if v is not None]
         top = max(good) * 1.2 if good else 1.0
         top = top or 1.0
-        p.setPen(QtGui.QPen(QtGui.QColor('#30363d'), 1))
+        p.setPen(QtGui.QPen(QtGui.QColor('#30373E'), 1))
         f = p.font()
         f.setPointSize(max(7, f.pointSize() - 2))
         p.setFont(f)
         for i in range(5):
             y = T + (B - T) * i / 4.0
-            p.setPen(QtGui.QPen(QtGui.QColor('#30363d'), 1))
+            p.setPen(QtGui.QPen(QtGui.QColor('#30373E'), 1))
             p.drawLine(QtCore.QPointF(L, y), QtCore.QPointF(R, y))
             p.setPen(QtGui.QColor(COLORS['hdr']))
             p.drawText(QtCore.QRectF(0, y - 8, L - 4, 16), qenum(Qt, 'AlignmentFlag.AlignRight') |
@@ -1862,7 +1862,7 @@ class NetConfigTab(ToolTab):
         sel = 0
         for r, it in enumerate(self.ifaces):
             up = '● bagli' if it.up else ('○ kablo yok' if it.up is False else '?')
-            col = '#2da44e' if it.up else '#888'
+            col = '#3DDC84' if it.up else '#888'
             mode = {True: 'DHCP', False: 'Statik', None: '-'}[it.dhcp]
             kind = {'wifi': ' (Wi-Fi)', 'virtual': ' (sanal)'}.get(it.kind, '')
             vals = [it.display + kind, up, f'{it.speed} Mbit/s' if it.speed else '-',
@@ -2081,7 +2081,7 @@ class PingTab(ToolTab):
         self.table.setMaximumHeight(170)
         self.table.itemSelectionChanged.connect(self._sel)
         root.addWidget(self.table)
-        self.graph = LineGraph('ms', '#7ee787', fmt='{:.1f}')
+        self.graph = LineGraph('ms', '#3DDC84', fmt='{:.1f}')
         root.addWidget(self.graph)
         opt = W.QHBoxLayout()
         self.chk_changes = W.QCheckBox('Gunluge sadece durum degisimlerini yaz (cevap geldi / kesildi)')
@@ -2219,7 +2219,7 @@ class PingTab(ToolTab):
             if it:
                 it.setText(v)
                 if c == 2:
-                    it.setForeground(QtGui.QBrush(QtGui.QColor('#2da44e' if r.ok else COLORS['error'])))
+                    it.setForeground(QtGui.QBrush(QtGui.QColor('#3DDC84' if r.ok else COLORS['error'])))
         if changed or first:
             if changed or not r.ok:
                 txt = f'{h}: ▲ CEVAP VERMEYE BASLADI' if r.ok else f'{h}: ▼ CEVAP KESILDI ({r.err})'
@@ -2500,14 +2500,14 @@ class IperfTab(ToolTab):
         f.setPointSize(f.pointSize() + 14)
         f.setBold(True)
         self.lbl_rate.setFont(f)
-        self.lbl_rate.setStyleSheet('color:#79c0ff')
+        self.lbl_rate.setStyleSheet('color:#2DD4BF')
         self.lbl_sum = W.QLabel('')
         self.lbl_sum.setStyleSheet('color:#888')
         big.addWidget(self.lbl_rate)
         big.addSpacing(20)
         big.addWidget(self.lbl_sum, 1)
         root.addLayout(big)
-        self.graph = LineGraph('Mbit/s', '#79c0ff', fmt='{:.0f}')
+        self.graph = LineGraph('Mbit/s', '#2DD4BF', fmt='{:.0f}')
         self.graph.setMinimumHeight(150)
         root.addWidget(self.graph)
         self.log = Terminal()
@@ -2637,14 +2637,40 @@ ALL_TYPES = SESSION_TYPES + NET_TYPES
 BRAND1, BRAND2 = '#FFB547', '#FF5F6D'      # BYS aile simgesinde BYSTerm'in renk cifti
 THEME = {'dark': True}
 
-_DARK = {
-    'win': '#1b1e24', 'panel': '#14161b', 'base': '#111318', 'alt': '#191c22', 'btn': '#262a32',
-    'border': '#30353e', 'text': '#d7dae0', 'muted': '#8b929c', 'hover': '#2f343d',
+ACC, ACC2 = '#2DD4BF', '#14B8A6'          # ATOLYE turkuaz vurgu (MutlakEncoder araclariyla ayni aile)
+_DARK = {      # ATOLYE: notr grafit
+    'win': '#141719', 'panel': '#101214', 'base': '#1A1E22', 'alt': '#171B1F', 'btn': '#232930',
+    'border': '#30373E', 'text': '#EDEEEF', 'muted': '#98A2AB', 'hover': '#2A323A', 'acc': ACC,
+    'accdark': ACC2, 'sel': '#14B8A6', 'pane_on': '#123430', 'pane_off': '#1A1E22',
 }
 _LIGHT = {
-    'win': '#f3f4f6', 'panel': '#e9ebef', 'base': '#ffffff', 'alt': '#f6f7f9', 'btn': '#ffffff',
-    'border': '#c9ced6', 'text': '#1f2328', 'muted': '#656d76', 'hover': '#e4e7eb',
+    'win': '#f3f5f6', 'panel': '#e8ecee', 'base': '#ffffff', 'alt': '#f5f7f8', 'btn': '#ffffff',
+    'border': '#c5ccd2', 'text': '#1d2125', 'muted': '#5f6a73', 'hover': '#e2e8ec', 'acc': '#0F9488',
+    'accdark': '#0B7A70', 'sel': '#0F9488', 'pane_on': '#d5f2ee', 'pane_off': '#e8ecee',
 }
+
+
+def _arrow_files(color):
+    """Sayi kutusu / acilir liste oklari: QSS ucgen hilesi her surumde calismadigi icin PNG cizilir."""
+    import tempfile
+    d = os.path.join(tempfile.gettempdir(), f'bysterm_ui_{os.getpid()}')
+    os.makedirs(d, exist_ok=True)
+    out = {}
+    for name, up in (('up', True), ('down', False)):
+        pm = QtGui.QPixmap(10, 6)
+        pm.fill(QtGui.QColor(0, 0, 0, 0))
+        p = QtGui.QPainter(pm)
+        p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(QtGui.QColor(color))
+        pts = [QtCore.QPointF(0.5, 5.5), QtCore.QPointF(9.5, 5.5), QtCore.QPointF(5, 0.5)] if up else \
+              [QtCore.QPointF(0.5, 0.5), QtCore.QPointF(9.5, 0.5), QtCore.QPointF(5, 5.5)]
+        p.drawPolygon(QtGui.QPolygonF(pts))
+        p.end()
+        f = os.path.join(d, f'{name}_{color.strip("#")}.png')
+        pm.save(f)
+        out[name] = f.replace('\\', '/')
+    return out
 
 
 def apply_theme(app, dark=True):
@@ -2655,8 +2681,8 @@ def apply_theme(app, dark=True):
     R = QtGui.QPalette
     roles = {'Window': c['win'], 'WindowText': c['text'], 'Base': c['base'], 'AlternateBase': c['alt'],
              'ToolTipBase': c['btn'], 'ToolTipText': c['text'], 'Text': c['text'], 'Button': c['btn'],
-             'ButtonText': c['text'], 'BrightText': '#ffffff', 'Highlight': '#e8774f',
-             'HighlightedText': '#ffffff', 'Link': BRAND1, 'PlaceholderText': c['muted']}
+             'ButtonText': c['text'], 'BrightText': '#ffffff', 'Highlight': c['sel'],
+             'HighlightedText': '#ffffff', 'Link': c['acc'], 'PlaceholderText': c['muted']}
     for name, col in roles.items():
         role = getattr(R, name, None) or getattr(getattr(R, 'ColorRole', R), name, None)
         if role is not None:
@@ -2665,17 +2691,18 @@ def apply_theme(app, dark=True):
     for name in ('Text', 'ButtonText', 'WindowText'):
         pal.setColor(dis, qenum(R, f'ColorRole.{name}'), QtGui.QColor(c['muted']))
     app.setPalette(pal)
+    ar = _arrow_files(c['muted'])
     app.setStyleSheet(f"""
         QToolTip {{ background: {c['btn']}; color: {c['text']}; border: 1px solid {c['border']}; padding: 4px; }}
         QPushButton {{ background: {c['btn']}; border: 1px solid {c['border']}; border-radius: 5px;
                       padding: 4px 9px; min-height: 18px; }}
-        QPushButton:hover {{ border-color: {BRAND1}; background: {c['hover']}; }}
+        QPushButton:hover {{ border-color: {c['acc']}; background: {c['hover']}; }}
         QPushButton:pressed {{ background: {c['border']}; }}
         QPushButton:disabled {{ color: {c['muted']}; border-color: {c['border']}; }}
-        QPushButton:checked {{ background: #5a2e2a; border-color: {BRAND2}; }}
-        QPushButton#primary {{ color: #1b1208; font-weight: bold; border: none;
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {BRAND1}, stop:1 {BRAND2}); }}
-        QPushButton#primary:hover {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffc56e, stop:1 #ff7a86); }}
+        QPushButton:checked {{ background: #2D1518; border-color: #F0555B; color: #F0555B; }}
+        QPushButton#primary {{ color: #04130d; font-weight: bold; border: none;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {c['acc']}, stop:1 {c['accdark']}); }}
+        QPushButton#primary:hover {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #5EEAD4, stop:1 {c['acc']}); }}
         QPushButton#primary:disabled {{ background: {c['border']}; color: {c['muted']}; }}
         QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ background: {c['base']}; border: 1px solid {c['border']};
             border-radius: 4px; padding: 2px 6px; min-height: 20px; }}
@@ -2686,23 +2713,20 @@ def apply_theme(app, dark=True):
         QSpinBox::down-button, QDoubleSpinBox::down-button {{ subcontrol-position: bottom right; }}
         QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
         QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{ background: {c['hover']}; }}
-        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{ width: 0; height: 0; border-left: 4px solid transparent;
-            border-right: 4px solid transparent; border-bottom: 5px solid {c['muted']}; }}
-        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{ width: 0; height: 0; border-left: 4px solid transparent;
-            border-right: 4px solid transparent; border-top: 5px solid {c['muted']}; }}
+        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{ image: url({ar['up']}); width: 10px; height: 6px; }}
+        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{ image: url({ar['down']}); width: 10px; height: 6px; }}
         QComboBox::drop-down {{ border: none; width: 18px; }}
-        QComboBox::down-arrow {{ width: 0; height: 0; border-left: 4px solid transparent;
-            border-right: 4px solid transparent; border-top: 5px solid {c['muted']}; }}
-        QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{ border-color: {BRAND1}; }}
-        QComboBox QAbstractItemView {{ background: {c['base']}; selection-background-color: #e8774f; }}
+        QComboBox::down-arrow {{ image: url({ar['down']}); width: 10px; height: 6px; }}
+        QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{ border-color: {c['acc']}; }}
+        QComboBox QAbstractItemView {{ background: {c['base']}; selection-background-color: {c['sel']}; }}
         QGroupBox {{ border: 1px solid {c['border']}; border-radius: 6px; margin-top: 14px; padding-top: 6px; }}
-        QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: {BRAND1}; font-weight: bold; }}
+        QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: {c['acc']}; font-weight: bold; }}
         QTableWidget, QListWidget {{ background: {c['base']}; alternate-background-color: {c['alt']};
             border: 1px solid {c['border']}; border-radius: 4px; gridline-color: {c['border']}; }}
         QHeaderView::section {{ background: {c['btn']}; border: none; border-right: 1px solid {c['border']};
             border-bottom: 1px solid {c['border']}; padding: 3px 6px; color: {c['muted']}; font-weight: bold; }}
         QSplitter::handle {{ background: {c['panel']}; }}
-        QSplitter::handle:hover {{ background: {BRAND1}; }}
+        QSplitter::handle:hover {{ background: {c['acc']}; }}
         QScrollBar:vertical {{ background: transparent; width: 10px; margin: 0; }}
         QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 0; }}
         QScrollBar::handle {{ background: {c['border']}; border-radius: 4px; min-height: 24px; min-width: 24px; }}
@@ -2712,10 +2736,10 @@ def apply_theme(app, dark=True):
         QStatusBar {{ background: {c['panel']}; color: {c['muted']}; border-top: 1px solid {c['border']}; }}
         QMenu {{ background: {c['btn']}; border: 1px solid {c['border']}; padding: 4px; }}
         QMenu::item {{ padding: 5px 22px; border-radius: 4px; }}
-        QMenu::item:selected {{ background: #e8774f; color: white; }}
+        QMenu::item:selected {{ background: {c['sel']}; color: white; }}
         QProgressBar {{ border: 1px solid {c['border']}; border-radius: 4px; text-align: center; background: {c['base']}; }}
         QProgressBar::chunk {{ border-radius: 3px;
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {BRAND1}, stop:1 {BRAND2}); }}
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c['acc']}, stop:1 #4FA8FF); }}
         #sidebar {{ background: {c['panel']}; }}
         #sidebarBrand {{ color: {c['text']}; }}
     """)
@@ -2801,8 +2825,8 @@ def tool_icon(kind, size=18):
     p = QtGui.QPainter(pm)
     p.setRenderHint(qenum(QtGui.QPainter, 'RenderHint.Antialiasing'))
     gr = QtGui.QLinearGradient(0, 0, size, size)
-    gr.setColorAt(0, QtGui.QColor(BRAND1))
-    gr.setColorAt(1, QtGui.QColor(BRAND2))
+    gr.setColorAt(0, QtGui.QColor(ACC))
+    gr.setColorAt(1, QtGui.QColor('#4FA8FF'))
     pen = QtGui.QPen(QtGui.QBrush(gr), 1.6)
     p.setPen(pen)
     s = float(size)
@@ -3265,7 +3289,7 @@ class Pane(W.QFrame):
         if s is None:
             self.title.setText('<span style="color:#888">(bos)</span>')
             return
-        dot = '<span style="color:#2da44e">●</span> ' if s.connected else ''
+        dot = '<span style="color:#3DDC84">●</span> ' if s.connected else ''
         self.title.setText(f'{dot}<b>{s.tab_label()}</b>')
 
     def set_active(self, on):
@@ -3274,7 +3298,7 @@ class Pane(W.QFrame):
             '#pane { border: 1px solid %s; }'
             '#paneHeader { background: %s; }'
             '#paneTitle { color: %s; }' % (
-                ('#e3b341', '#3a3320', '#f0f0f0') if on else ('#3a3f47', '#2a2e35', '#c9d1d9')))
+                (ACC, '#123430', '#EDEEEF') if on else ('#30373E', '#1A1E22', '#98A2AB')))
 
 
 class Workspace(W.QWidget):
@@ -3496,7 +3520,7 @@ class Sidebar(W.QWidget):
         self.setAttribute(qenum(Qt, 'WidgetAttribute.WA_StyledBackground'))
         self.setStyleSheet('QPushButton#tool { text-align: left; padding: 6px 8px; border: none; border-radius: 5px;'
                            ' background: transparent; }'
-                           'QPushButton#tool:hover { background: rgba(255,181,71,0.13); }'
+                           'QPushButton#tool:hover { background: rgba(45,212,191,0.13); }'
                            'QToolButton { border: none; border-radius: 4px; }'
                            'QToolButton:hover { background: rgba(126,231,135,0.18); }'
                            'QLabel#grp { color: #8b929c; font-size: 10px; font-weight: bold; letter-spacing: 1px;'
@@ -3531,7 +3555,7 @@ class Sidebar(W.QWidget):
                 b.setToolTip(f'{cls.TITLE}: aktif bolmede ac (varsa mevcut olana gec)')
                 b.clicked.connect(lambda _=False, c=cls: main.open_tool(c, split=False))
                 plus = W.QToolButton()
-                plus.setIcon(_icon('plus', '#7ee787'))
+                plus.setIcon(_icon('plus', ACC))
                 plus.setAutoRaise(True)
                 plus.setToolTip(f'Yeni {cls.TITLE}: aktif bolmenin YANINA ac (Terminator gibi)')
                 plus.clicked.connect(lambda _=False, c=cls: main.open_tool(c, split=True))
@@ -3557,7 +3581,7 @@ class Sidebar(W.QWidget):
             vis = ws.pane_of(s) is not None
             it = W.QListWidgetItem(('● ' if s.connected else '○ ') + s.tab_label() + ('' if vis else '   (arka planda)'))
             it.setData(qenum(Qt, 'ItemDataRole.UserRole'), id(s))
-            col = '#2da44e' if s.connected else (None if vis else '#888')
+            col = '#3DDC84' if s.connected else (None if vis else '#888')
             if col:
                 it.setForeground(QtGui.QBrush(QtGui.QColor(col)))
             if ws.active is not None and ws.active.session is s:
@@ -3863,10 +3887,10 @@ class MainWindow(W.QMainWindow):
     # -- yonetici izni
     def admin_state(self):
         if net.is_admin():
-            return True, '<span style="color:#2da44e">🔓 Yonetici: aktif</span>'
+            return True, '<span style="color:#3DDC84">🔓 Yonetici: aktif</span>'
         h = net.PrivHelper.instance
         if h is not None and h.alive:
-            return True, '<span style="color:#2da44e">🔓 Yonetici izni: verildi</span>'
+            return True, '<span style="color:#3DDC84">🔓 Yonetici izni: verildi</span>'
         return False, '<span style="color:#888">🔒 Yonetici izni yok (IP degisikliginde sorulur)</span>'
 
     def _admin_changed(self):
