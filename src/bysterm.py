@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-BYSTerm — Seri port / TCP / UDP hizli test ve izleme araci
-(Hercules + Eltima Serial Port Monitor karisimi; Windows / macOS / Linux / Jetson).
+BYSTerm — Seri port / TCP / UDP hizli test ve izleme araci (Windows / macOS / Linux / Jetson).
 
   * Seri port   : aktif portlari isim/aciklamalariyla listeler (otomatik yeniler),
                   standart baud'lar, 5-8 bit, parity, stop, akis kontrolu, DTR/RTS, BREAK,
@@ -9,9 +8,10 @@ BYSTerm — Seri port / TCP / UDP hizli test ve izleme araci
   * TCP istemci : host:port'a baglan.
   * TCP sunucu  : dinle, bagli istemcileri listele, hepsine / secilene gonder, at.
   * UDP         : yerel porttan dinle, hedefe gonder, gelen paketin kaynagini goster/yanitla.
-  * Seri izleme : BASKA bir uygulamanin seri trafigini izle (Eltima benzeri) —
-                  Linux/macOS'ta sanal port (pty) otomatik olusur; Windows'ta com0com gibi
-                  sanal null-modem cifti ile. Iki port pasif dinleme (donanim tap) de var.
+  * Seri izleme : bir portu, BASKA bir uygulama kullanirken pasif dinle (sadece port secilir).
+                  Windows: USB-seri ceviriciler (USBPcap). Linux/Jetson: strace.
+  * Sanal port  : gercek port <-> sanal port koprusu, birbirine bagli sanal port cifti,
+                  iki gercek portla donanim tap.
 
 Her sekmede: ASCII / HEX / HEX+ASCII gorunum, zaman damgasi, kayit (.log metin / .bin ham),
 ASCII (\\r \\n \\xHH kacisli) veya HEX gonderme, satir sonu secimi, periyodik tekrar, dosya gonder.
@@ -84,7 +84,7 @@ from bysterm_i18n import tr, tx, tx_exact, set_lang, LANGS   # noqa: E402
 from bysterm_core import RX, TX  # noqa: E402
 
 APP_NAME = 'BYSTerm'
-APP_VERSION = '0.4.0'
+APP_VERSION = '0.5.0'
 
 Qt = QtCore.Qt
 W = QtWidgets
@@ -334,7 +334,7 @@ def install_i18n():
 
 # =========================================================================== akan yerlesim
 class FlowLayout(W.QLayout):
-    """Dar pencerede alt satira kayan yatay yerlesim (Terminator tarzi bolmeler icin).
+    """Dar pencerede alt satira kayan yatay yerlesim (yan yana bolmeler icin).
 
     * Bir QLabel ile ardindan gelen kutu BIRLIKTE tasinir ("Baud [115200]" bolunmez).
     * addWidget(w, stretch>0) olan ogeler satirda kalan boslugu doldurur.
@@ -1539,46 +1539,31 @@ class UdpSession(Session):
 
 # =========================================================================== seri izleme
 class MonitorSession(Session):
+    """Seri port dinleme: sadece port secilir. Portu baska bir uygulama kullanirken trafigi gosterir;
+    BYSTerm porta hic dokunmaz. Windows: USB-seri ceviriciler (USBPcap). Linux/Jetson: strace."""
     KIND = 'monitor'
     TITLE = 'Seri Izleme'
     HAS_SEND = False
 
     def build_connection(self, row, col):
-        # --- mod secimi
-        mrow = FlowLayout()
-        self.mode_sel = W.QComboBox()
-        if core.IS_WIN:
-            self.mode_sel.addItem('Canli dinleme (USB-seri, Eltima gibi)', 'live')
-        else:
-            self.mode_sel.addItem('Canli dinleme (calisan uygulamayi izle)', 'live')
-        self.mode_sel.addItem('Sanal port koprusu', 'bridge')
-        self.mode_sel.addItem('Pasif donanim tap (2 port)', 'tap')
-        if not (core.IS_LINUX or core.IS_WIN):
-            self.mode_sel.model().item(0).setEnabled(False)   # macOS: canli dinleme yok
-            self.mode_sel.setCurrentIndex(1)
-        self.mode_sel.currentIndexChanged.connect(self._mode_changed)
-        mrow.addWidget(W.QLabel('Yontem'))
-        mrow.addWidget(self.mode_sel, 1)
-        self.btn_rescan = W.QToolButton()
-        self.btn_rescan.setText('⟳')
-        self.btn_rescan.setToolTip('Seri port acmis uygulamalari yeniden tara')
-        self.btn_rescan.clicked.connect(lambda: self._fill_procs())
-        mrow.addWidget(self.btn_rescan)
-        col.addLayout(mrow)
+        self.port = W.QComboBox()
+        self.port.setEditable(True)
+        self.port.setMinimumWidth(240)
+        self.port.setSizeAdjustPolicy(qenum(W.QComboBox, 'SizeAdjustPolicy.AdjustToContents'))
+        self.port.lineEdit().setPlaceholderText('Dinlenecek port (COM3, /dev/ttyUSB0)')
+        self.port.currentIndexChanged.connect(lambda *_: (self._show_openers(), self.main.session_state_changed(self)))
+        self.btn_refresh = W.QToolButton()
+        self.btn_refresh.setText('⟳')
+        self.btn_refresh.setToolTip('Port listesini simdi yenile')
+        self.btn_refresh.clicked.connect(self.main.rescan_ports_now)
+        row.addWidget(W.QLabel('Port'))
+        row.addWidget(self.port, 1)
+        row.addWidget(self.btn_refresh)
 
-        # --- canli dinleme: surec listesi
-        self.live_row = W.QWidget()
-        lr = FlowLayout(self.live_row)
-        self.proc = W.QComboBox()
-        self.proc.setMinimumWidth(320)
-        if core.IS_WIN:      # Windows: izlenecek COM portu (USB-seri cevirici) secilir
-            self.proc.setToolTip('Izlenecek USB-seri port. Portu baska bir uygulama acmis olabilir; '
-                                 'BYSTerm porta dokunmaz.')
-            lr.addWidget(W.QLabel('Port'))
-        else:
-            lr.addWidget(W.QLabel('Uygulama'))
-        lr.addWidget(self.proc, 1)
-        col.addWidget(self.live_row)
+        self.lbl_state = W.QLabel('')
+        self.lbl_state.setStyleSheet('color:#8b929c')
+        self.lbl_state.setWordWrap(True)
+        col.addWidget(self.lbl_state)
 
         # Windows: USBPcap (imzali USB yakalama surucusu) durumu / kurulum
         self.usb_row = W.QWidget()
@@ -1591,148 +1576,79 @@ class MonitorSession(Session):
         ur.addWidget(self.btn_usbpcap)
         ur.addWidget(self.lbl_usbpcap, 1)
         col.addWidget(self.usb_row)
-        self.usb_row.setVisible(False)
-
-        # --- kopru / tap: gercek port + ayar
-        self.ss = SerialSettings(self.main)
-        self.ss.port.lineEdit().setPlaceholderText('Cihazin bagli oldugu GERCEK port')
-        self.port_row = W.QWidget()
-        pr = FlowLayout(self.port_row)
-        pr.addWidget(W.QLabel('Gercek'))
-        pr.addWidget(self.ss, 1)
-        col.addWidget(self.port_row)
-
-        self.virt_row = W.QWidget()
-        r2 = FlowLayout(self.virt_row)
-        self.virt = W.QComboBox()
-        self.virt.setEditable(True)
-        self.virt.setMinimumWidth(200)
-        self.chk_follow = W.QCheckBox('Uygulamanin baud/format ayarini takip et')
-        self.chk_follow.setChecked(True)
-        self.chk_follow.setToolTip('Diger uygulama sanal portu hangi baud ile acarsa gercek port '
-                                   'de o baud\'a gecer (Linux/macOS)')
-        self.lbl_v = W.QLabel('Sanal port')
-        r2.addWidget(self.lbl_v)
-        r2.addWidget(self.virt, 1)
-        r2.addWidget(self.chk_follow)
-        col.addWidget(self.virt_row)
-        self.chk_passive = W.QCheckBox()      # geriye uyum (make_transport kullanir)
-        self.chk_passive.setVisible(False)
-
-        # Windows: com0com sanal port surucusu kur / cift olustur
-        self.c0c_row = W.QWidget()
-        cc = FlowLayout(self.c0c_row)
-        self.btn_c0c = W.QPushButton('Sanal port surucusu kur (com0com)')
-        self.btn_c0c.clicked.connect(self._c0c_install)
-        self.btn_c0c_pair = W.QPushButton('Yeni sanal port cifti olustur')
-        self.btn_c0c_pair.clicked.connect(self._c0c_pair)
-        self.lbl_c0c = W.QLabel('')
-        self.lbl_c0c.setStyleSheet('color:#8b929c')
-        cc.addWidget(self.btn_c0c)
-        cc.addWidget(self.btn_c0c_pair)
-        cc.addWidget(self.lbl_c0c, 1)
-        col.addWidget(self.c0c_row)
-        self.c0c_row.setVisible(core.IS_WIN)
+        self.usb_row.setVisible(core.IS_WIN)
 
         self.help = W.QLabel()
         self.help.setWordWrap(True)
         self.help.setStyleSheet('color:#888')
         col.addWidget(self.help)
-        self.chk_follow.setVisible(core.IS_POSIX)
-        self._fill_virt(self.main.ports)
-        self._fill_procs()
-        self._mode_changed()
-
-    def cur_mode(self):
-        return self.mode_sel.currentData()
-
-    def _mode_changed(self, *_):
-        mode = self.cur_mode()
-        self.chk_passive.setChecked(mode == 'tap')
-        self.live_row.setVisible(mode == 'live')
-        self.port_row.setVisible(mode != 'live')
-        self.virt_row.setVisible(mode == 'bridge')
-        self.usb_row.setVisible(core.IS_WIN and mode == 'live')
-        self.btn_rescan.setToolTip('Portlari yeniden tara' if core.IS_WIN else
-                                   'Seri port acmis uygulamalari yeniden tara')
-        if mode == 'live' and core.IS_WIN:
-            self._fill_procs()
-            self._usbpcap_refresh()
-            self.help.setText(
-                'CANLI DINLEME (Windows, Eltima gibi): Portu BASKA bir uygulama acmisken bile o porttaki '
-                'trafigi SANAL PORT OLMADAN gorursunuz; o uygulama hic degismez, BYSTerm porta dokunmaz. '
-                'Gelen/giden veri, uygulamanin sectigi baud/format ve DTR/RTS degisiklikleri gorunur. '
-                'USB-seri ceviriciler icindir (FTDI, CP210x, CH340, PL2303, Arduino/STM32/ESP32 gibi USB '
-                'CDC). Bir kez ucretsiz USBPcap surucusu kurulur (Wireshark da kullanir, Microsoft imzali). '
-                'Anakart uzerindeki yerlesik COM portlari icin "Sanal port koprusu" yontemini kullanin.')
-        elif mode == 'live':
-            self._fill_procs()
-            self.help.setText(
-                'CANLI DINLEME (Linux/Jetson): Portu BASKA bir uygulama acsa bile (orn. minicom, kendi '
-                'programiniz), o uygulamanin seri trafigini SANAL PORT OLMADAN burada gorursunuz; izlenen '
-                'uygulama hic degismez, veriye dokunulmaz (pasif). Listeden uygulamayi secip baslatin. '
-                'Yetki gerekirse yonetici izni istenir.')
-        elif mode == 'tap':
-            self.lbl_v.setText('Ikinci port (B)')
-            self.help.setText(
-                'PASIF DONANIM TAP: Iki USB-seri cevirici; A = ustteki port, B = asagidaki ikinci port, '
-                'RX uclari izlenen hattin TX ve RX\'ine baglanir. BYSTerm ikisini de sadece dinler. '
-                'GND\'leri ortak baglayin.')
-            self.virt_row.setVisible(True)
-            self.lbl_v.setText('Ikinci port (B)')
-            self.chk_follow.setVisible(False)
-            self.virt.lineEdit().setPlaceholderText('ikinci gercek port (B)')
-        else:
-            self.lbl_v.setText('Sanal port')
-            self.chk_follow.setVisible(core.IS_POSIX)
-            self._passive_toggled(False)
-        if hasattr(self, 'c0c_row'):
-            self.c0c_row.setVisible(core.IS_WIN and mode == 'bridge')
-            if core.IS_WIN and mode == 'bridge':
-                self._c0c_refresh()
-
-    def _fill_procs(self):
         if core.IS_WIN:
-            return self._fill_usb_ports(self.main.ports)
-        if not core.IS_LINUX or self.proc.view().isVisible():
-            return
-        cur = self.proc.currentData()
-        self.proc.blockSignals(True)
-        self.proc.clear()
-        openers = core.list_serial_openers()
-        for o in openers:
-            for dev in o['devices']:
-                short = o['cmd'] if len(o['cmd']) < 60 else o['cmd'][:57] + '...'
-                self.proc.addItem(f'{dev}  ←  {o["name"]} (pid {o["pid"]})  {short}', (o['pid'], dev))
-        if self.proc.count() == 0:
-            self.proc.addItem('(seri port acmis uygulama bulunamadi — once o uygulamada portu acin)', None)
-        idx = self.proc.findData(cur) if cur else -1
-        self.proc.setCurrentIndex(max(0, idx))
-        self.proc.blockSignals(False)
+            self.help.setText(
+                'Portu baska bir uygulama kullanirken o porttaki trafigi gosterir; o uygulama hic degismez, '
+                'BYSTerm porta dokunmaz. Gelen/giden veri, uygulamanin sectigi baud/format ve DTR/RTS '
+                'degisiklikleri gorunur. USB-seri ceviriciler icindir (FTDI, CP210x, CH340, PL2303, '
+                'Arduino/STM32/ESP32 gibi USB CDC cihazlar). Bir kez ucretsiz USBPcap surucusu kurulur. '
+                'Anakart uzerindeki yerlesik COM portlari icin "Sanal Port" aracindaki kopruyu kullanin.')
+        elif core.IS_LINUX:
+            self.help.setText(
+                'Portu baska bir uygulama kullanirken o porttaki trafigi gosterir; o uygulama hic degismez, '
+                'BYSTerm porta dokunmaz. Uygulama portu sonradan acsa, kapatip yeniden acsa ya da baska bir '
+                'uygulama acsa da dinleme kendiliginden devam eder. Yetki gerekirse yonetici izni istenir.')
+        else:
+            self.help.setText(
+                'Bu sistemde port dinleme desteklenmiyor. Trafigi gormek icin "Sanal Port" aracindaki '
+                'kopruyu kullanin.')
+        self._usbpcap_refresh()
+        self.update_ports(self.main.ports)
 
-    def _fill_usb_ports(self, ports):
-        if self.proc.view().isVisible():
+    def current_device(self):
+        i = self.port.currentIndex()
+        txt = self.port.currentText().strip()
+        if i >= 0 and self.port.itemText(i) == txt:
+            d = self.port.itemData(i)
+            return d[0] if d else txt
+        return txt.split('  —  ')[0].split('  [')[0].strip()
+
+    def _port_info(self, dev):
+        for p in self.main.ports:
+            if p.device == dev:
+                return p
+        return None
+
+    def update_ports(self, ports):
+        if self.transport or self.port.view().isVisible():
             return
-        cur = self.proc.currentData()
-        self.proc.blockSignals(True)
-        self.proc.clear()
-        for p in ports:
-            if p.vid is not None:        # sadece USB cihazlari
-                self.proc.addItem(p.label, (p.device, p.vid, p.pid))
-        for p in ports:
-            if p.vid is None:
-                self.proc.addItem(p.label + '  (USB degil)', (p.device, None, None))
-        if self.proc.count() == 0:
-            self.proc.addItem('(seri port bulunamadi — USB-seri ceviriciyi takin)', None)
-        idx = -1
-        if cur:
-            for i in range(self.proc.count()):
-                d = self.proc.itemData(i)
-                if d and d[0] == cur[0]:
-                    idx = i
-                    break
-        self.proc.setCurrentIndex(max(0, idx))
-        self.proc.blockSignals(False)
+        cur = self.current_device()
+        typed = self.port.currentText().strip()
+        self.port.blockSignals(True)
+        self.port.clear()
+        order = sorted(ports, key=lambda p: p.vid is None) if core.IS_WIN else list(ports)
+        sel = -1
+        for p in order:
+            lbl = p.label + (tx('  (USB degil)') if core.IS_WIN and p.vid is None else '')
+            self.port.addItem(lbl, (p.device, p.vid, p.pid))
+            self.port.setItemData(self.port.count() - 1, p.tooltip, qenum(Qt, 'ItemDataRole.ToolTipRole'))
+            if p.device == cur:
+                sel = self.port.count() - 1
+        if sel >= 0:
+            self.port.setCurrentIndex(sel)
+        elif typed and cur:
+            self.port.setEditText(cur)
+        elif self.port.count():
+            self.port.setCurrentIndex(0)
+        self.port.blockSignals(False)
+        self._show_openers()
+
+    def _show_openers(self):
+        """Linux: secili portu su an hangi uygulamanin actigini goster."""
+        if not core.IS_LINUX or self.transport:
+            return
+        dev = self.current_device()
+        op = core.port_openers(dev) if dev else {}
+        if op:
+            self.lbl_state.setText('Portu kullanan: ' + ', '.join(f'{n} (pid {p})' for p, (n, _f) in sorted(op.items())))
+        else:
+            self.lbl_state.setText('Portu su an kullanan uygulama yok (baslatinca beklenir)' if dev else '')
 
     def _usbpcap_refresh(self):
         if not core.IS_WIN:
@@ -1758,6 +1674,179 @@ class MonitorSession(Session):
         if not ok and 'Iptal' not in msg:
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(usbsniff.USBPCAP_PAGE))
 
+    def labels(self):
+        return {RX: 'CIHAZ>', TX: 'UYGUL>'}
+
+    def connect_text(self):
+        return 'Dinlemeyi baslat'
+
+    def disconnect_text(self):
+        return 'Durdur'
+
+    def make_transport(self):
+        dev = self.current_device()
+        if not dev:
+            raise ValueError('Dinlenecek portu secin')
+        if core.IS_WIN:
+            p = self._port_info(dev)
+            if p is not None and p.vid is None:
+                raise ValueError(f'{dev} bir USB cihazi degil. Yerlesik COM portlari icin '
+                                 '"Sanal Port" aracindaki kopruyu kullanin.')
+            return usbsniff.UsbSerialSniffer(dev, vid=p.vid if p else None, pid=p.pid if p else None)
+        if core.IS_LINUX:
+            return core.PortSniffer(dev)
+        raise ValueError('Bu sistemde port dinleme desteklenmiyor. "Sanal Port" aracindaki kopruyu kullanin.')
+
+    def set_inputs_enabled(self, en):
+        for w in (self.port, self.btn_refresh, self.btn_usbpcap):
+            w.setEnabled(en)
+
+    def tab_label(self):
+        dev = self.current_device()
+        return tx('Izleme ') + os.path.basename(dev) if dev else tx('Seri Izleme')
+
+    def save_settings(self, st):
+        st.setValue('monitor/port', self.current_device())
+
+    def load_settings_into(self, st):
+        dev = st.value('monitor/port', '')
+        if dev:
+            for i in range(self.port.count()):
+                d = self.port.itemData(i)
+                if d and d[0] == dev:
+                    self.port.setCurrentIndex(i)
+                    break
+
+
+class VirtualPortSession(Session):
+    """Sanal port islemleri: gercek port <-> sanal port koprusu, birbirine bagli sanal port cifti,
+    iki gercek portla donanim tap. Trafik iki yonde gorunur."""
+    KIND = 'vport'
+    TITLE = 'Sanal Port'
+    HAS_SEND = False
+
+    def build_connection(self, row, col):
+        self.mode_sel = W.QComboBox()
+        self.mode_sel.addItem('Kopru: gercek port ↔ sanal port', 'bridge')
+        self.mode_sel.addItem('Sanal port cifti (iki uygulamayi birbirine bagla)', 'pair')
+        self.mode_sel.addItem('Donanim tap: iki gercek portu dinle', 'tap')
+        self.mode_sel.currentIndexChanged.connect(self._mode_changed)
+        row.addWidget(W.QLabel('Yontem'))
+        row.addWidget(self.mode_sel, 1)
+
+        # gercek port + ayar (kopru / tap)
+        self.ss = SerialSettings(self.main)
+        self.ss.port.lineEdit().setPlaceholderText('Cihazin bagli oldugu GERCEK port')
+        self.port_row = W.QWidget()
+        pr = FlowLayout(self.port_row)
+        self.lbl_real = W.QLabel('Gercek')
+        pr.addWidget(self.lbl_real)
+        pr.addWidget(self.ss, 1)
+        col.addWidget(self.port_row)
+
+        # sanal port (kopru) / ikinci port (tap)
+        self.virt_row = W.QWidget()
+        r2 = FlowLayout(self.virt_row)
+        self.virt = W.QComboBox()
+        self.virt.setEditable(True)
+        self.virt.setMinimumWidth(200)
+        self.chk_follow = W.QCheckBox('Uygulamanin baud/format ayarini takip et')
+        self.chk_follow.setChecked(True)
+        self.chk_follow.setToolTip('Diger uygulama sanal portu hangi baud ile acarsa gercek port '
+                                   'de o baud\'a gecer (Linux/macOS)')
+        self.lbl_v = W.QLabel('Sanal port')
+        r2.addWidget(self.lbl_v)
+        r2.addWidget(self.virt, 1)
+        r2.addWidget(self.chk_follow)
+        col.addWidget(self.virt_row)
+
+        # sanal port cifti (Linux/macOS): iki yol
+        self.pair_row = W.QWidget()
+        r3 = FlowLayout(self.pair_row)
+        self.ed_a = W.QLineEdit('/tmp/ttyV0')
+        self.ed_b = W.QLineEdit('/tmp/ttyV1')
+        for w in (self.ed_a, self.ed_b):
+            w.setMinimumWidth(140)
+        r3.addWidget(W.QLabel('Port A'))
+        r3.addWidget(self.ed_a, 1)
+        r3.addWidget(W.QLabel('Port B'))
+        r3.addWidget(self.ed_b, 1)
+        col.addWidget(self.pair_row)
+
+        # Windows: com0com sanal port surucusu kur / cift olustur
+        self.c0c_row = W.QWidget()
+        cc = FlowLayout(self.c0c_row)
+        self.btn_c0c = W.QPushButton('Sanal port surucusu kur (com0com)')
+        self.btn_c0c.clicked.connect(self._c0c_install)
+        self.btn_c0c_pair = W.QPushButton('Yeni sanal port cifti olustur')
+        self.btn_c0c_pair.clicked.connect(self._c0c_pair)
+        self.lbl_c0c = W.QLabel('')
+        self.lbl_c0c.setStyleSheet('color:#8b929c')
+        self.lbl_c0c.setWordWrap(True)
+        cc.addWidget(self.btn_c0c)
+        cc.addWidget(self.btn_c0c_pair)
+        cc.addWidget(self.lbl_c0c, 1)
+        col.addWidget(self.c0c_row)
+
+        self.help = W.QLabel()
+        self.help.setWordWrap(True)
+        self.help.setStyleSheet('color:#888')
+        col.addWidget(self.help)
+        self._fill_virt(self.main.ports)
+        self._mode_changed()
+        QtCore.QTimer.singleShot(0, self._mode_changed)        # baslat dugmesi olustuktan sonra
+
+    def cur_mode(self):
+        return self.mode_sel.currentData()
+
+    def _mode_changed(self, *_):
+        mode = self.cur_mode()
+        win = core.IS_WIN
+        self.port_row.setVisible(mode in ('bridge', 'tap'))
+        self.virt_row.setVisible(mode in ('bridge', 'tap'))
+        self.pair_row.setVisible(mode == 'pair' and not win)
+        self.c0c_row.setVisible(win and mode in ('bridge', 'pair'))
+        self.chk_follow.setVisible(mode == 'bridge' and core.IS_POSIX)
+        if getattr(self, 'btn_connect', None) is not None:      # build_connection sirasinda henuz yok
+            self.btn_connect.setVisible(not (win and mode == 'pair'))
+        if mode == 'tap':
+            self.lbl_real.setText(tx('Port A'))
+            self.lbl_v.setText(tx('Port B'))
+            self.virt.lineEdit().setPlaceholderText(tx('ikinci gercek port (B)'))
+            self.help.setText(
+                'DONANIM TAP: Iki USB-seri cevirici; A ve B portlarinin RX uclari izlenen hattin TX ve '
+                'RX\'ine baglanir. BYSTerm ikisini de sadece dinler, hatta hicbir sey gondermez. '
+                'GND\'leri ortak baglayin.')
+        elif mode == 'pair':
+            if win:
+                self.help.setText(
+                    'Windows\'ta sanal port cifti com0com surucusuyle olusturulur (orn. COM11 <-> COM12): '
+                    'bir uygulama COM11\'i, digeri COM12\'yi acar ve birbirleriyle konusur. Ciftler kalicidir. '
+                    'Trafigi BYSTerm\'de gormek icin "Kopru" yontemini kullanin.')
+            else:
+                self.help.setText(
+                    'Birbirine bagli iki sanal port olusturulur (A ve B). Bir uygulamada A\'yi, digerinde '
+                    'B\'yi acin: birinin yazdigi digerine gider, iki yondeki trafik burada gorunur.')
+        else:
+            self.lbl_real.setText(tx('Gercek'))
+            self.lbl_v.setText(tx('Sanal port'))
+            if core.IS_POSIX:
+                self.virt.lineEdit().setPlaceholderText('/tmp/ttyV0')
+                self.help.setText(
+                    'BYSTerm gercek portu acar ve bir SANAL port olusturur (yukaridaki yol, orn. /tmp/ttyV0). '
+                    'Uygulamanizda gercek port yerine bu sanal portu acin; iki yondeki trafik burada gorunur '
+                    've oldugu gibi iletilir. (Gercek port baska uygulamada aciksa once onu kapatin.)')
+            else:
+                self.virt.lineEdit().setPlaceholderText(tx('ornek: COM11 (com0com ciftinin BIR ucu)'))
+                self.help.setText(
+                    'Bir sanal port cifti gerekir (com0com, orn. COM11<->COM12). BYSTerm gercek portu ve '
+                    'ciftin BIR ucunu (COM11) acar; uygulamanizda ciftin OBUR ucunu (COM12) acin. '
+                    'Trafik iki yonde iletilir ve gorunur.')
+        if win and mode in ('bridge', 'pair'):
+            self._c0c_refresh()
+        if getattr(self, 'btn_connect', None) is not None:
+            self.main.session_state_changed(self)          # bolme basligi yeni yonteme gore
+
     def _fill_virt(self, ports):
         if self.virt.view().isVisible():
             return
@@ -1773,8 +1862,6 @@ class MonitorSession(Session):
         elif not core.IS_POSIX:
             self.virt.setEditText('')
         self.virt.blockSignals(False)
-        if not core.IS_POSIX:
-            self.virt.lineEdit().setPlaceholderText('ornek: COM11 (com0com ciftinin BIR ucu)')
 
     def _c0c_refresh(self):
         if not core.IS_WIN:
@@ -1787,7 +1874,7 @@ class MonitorSession(Session):
             self.btn_c0c_pair.setEnabled(True)
         else:
             self.btn_c0c.setText('Sanal port surucusu kur (com0com)')
-            self.lbl_c0c.setText('Seri izleme icin bir kez kurulur (ucretsiz).')
+            self.lbl_c0c.setText('Sanal port cifti icin bir kez kurulur (ucretsiz).')
             self.btn_c0c_pair.setEnabled(False)
 
     def _c0c_install(self):
@@ -1814,94 +1901,74 @@ class MonitorSession(Session):
         self.lbl_c0c.setText(msg)
         QtCore.QTimer.singleShot(1500, self._c0c_refresh)
 
-    def _passive_toggled(self, on):
-        self.lbl_v.setText('Ikinci port (B)' if on else 'Sanal port')
-        self.chk_follow.setEnabled(not on)
-        if on:
-            self.help.setText(
-                'PASIF DINLEME: Iki gercek port ayni baud ile acilir ve SADECE dinlenir. '
-                'A = ustteki port (orn. cihazin TX hatti), B = bu port (orn. cihazin RX hatti). '
-                'Ceviricilerin GND\'lerini hatta baglamayi unutmayin.')
-        elif core.IS_POSIX:
-            self.help.setText(
-                'Nasil calisir: BYSTerm gercek portu acar ve bir SANAL port olusturur (yukaridaki yol, '
-                'orn. /tmp/ttyV0). Izlemek istediginiz uygulamada gercek port yerine bu sanal portu acin; '
-                'iki yondeki tum trafik burada gorunur ve oldugu gibi iletilir. '
-                '(Gercek port zaten baska uygulamada aciksa once onu kapatin.)')
-        else:
-            self.help.setText(
-                'Nasil calisir (Windows): Bir sanal null-modem cifti gerekir (ucretsiz com0com: '
-                'orn. COM11<->COM12). BYSTerm gercek portu ve ciftin BIR ucunu (COM11) acar; '
-                'izlediginiz uygulamada ciftin OBUR ucunu (COM12) acin. Trafik iki yonde iletilir ve gorunur.')
-
     def labels(self):
-        if self.cur_mode() == 'tap':
-            return {RX: 'A>', TX: 'B>'}
-        return {RX: 'CIHAZ>', TX: 'UYGUL>'}
+        if self.cur_mode() == 'bridge':
+            return {RX: 'CIHAZ>', TX: 'UYGUL>'}
+        return {RX: 'A>', TX: 'B>'}
 
     def connect_text(self):
-        return 'Izlemeyi baslat'
+        return 'Baslat'
 
     def disconnect_text(self):
         return 'Durdur'
 
-    def make_transport(self):
-        if self.cur_mode() == 'live' and core.IS_WIN:
-            d = self.proc.currentData()
-            if not d:
-                raise ValueError('Izlenecek USB-seri portu secin')
-            dev, vid, pid = d
-            if vid is None:
-                raise ValueError(f'{dev} bir USB cihazi degil. Yerlesik COM portlari icin '
-                                 '"Sanal port koprusu" yontemini kullanin.')
-            return usbsniff.UsbSerialSniffer(dev, vid=vid, pid=pid)
-        if self.cur_mode() == 'live':
-            d = self.proc.currentData()
-            if not d:
-                raise ValueError('Izlenecek uygulamayi secin (seri port acmis bir surec)')
-            pid, dev = d
-            return core.SerialSniffer(pid, dev)
-        cfg = self.ss.config()
+    def _virt_value(self):
         i = self.virt.currentIndex()
         txt = self.virt.currentText().strip()
-        virt = (self.virt.itemData(i) if i >= 0 and self.virt.itemText(i) == txt else None) or \
+        return (self.virt.itemData(i) if i >= 0 and self.virt.itemText(i) == txt else None) or \
             txt.split('  —  ')[0].split('  [')[0].strip()
+
+    def make_transport(self):
+        mode = self.cur_mode()
+        if mode == 'pair':
+            if core.IS_WIN:
+                raise ValueError('Windows\'ta sanal port ciftini "Yeni sanal port cifti olustur" ile olusturun')
+            return core.PtyPair(self.ed_a.text(), self.ed_b.text())
+        cfg = self.ss.config()
+        virt = self._virt_value()
         if not virt:
             raise ValueError('Sanal / ikinci port belirtin')
         if os.path.normcase(virt) == os.path.normcase(cfg.port):
             raise ValueError('Gercek port ile sanal/ikinci port ayni olamaz')
-        return core.SerialBridge(cfg, virt, follow=self.chk_follow.isChecked(),
-                                 passive=self.chk_passive.isChecked())
+        return core.SerialBridge(cfg, virt, follow=self.chk_follow.isChecked(), passive=(mode == 'tap'))
 
     def set_inputs_enabled(self, en):
-        for w in (self.ss, self.virt, self.chk_follow, self.mode_sel, self.proc, self.btn_rescan):
+        for w in (self.ss, self.virt, self.chk_follow, self.mode_sel, self.ed_a, self.ed_b):
             w.setEnabled(en)
-        self.btn_usbpcap.setEnabled(en)
 
     def tab_label(self):
-        if self.cur_mode() == 'live':
-            d = self.proc.currentData()
-            if not d:
-                return tx('Seri Izleme')
-            return tx('Dinle ') + (d[0] if core.IS_WIN else os.path.basename(d[1]))
-        return tx('Izleme ') + os.path.basename(self.ss.current_device() or '')
+        mode = self.cur_mode()
+        if mode == 'pair':
+            return f'{os.path.basename(self.ed_a.text())} ↔ {os.path.basename(self.ed_b.text())}'
+        dev = os.path.basename(self.ss.current_device() or '')
+        if mode == 'tap':
+            return f'Tap {dev}'
+        return f'{dev} ↔ {os.path.basename(self._virt_value() or "")}'
 
     def update_ports(self, ports):
         if not self.transport:
             self.ss.update_ports(ports)
             self._fill_virt(ports)
-            if self.cur_mode() == 'live':
-                self._fill_procs()
 
     def save_settings(self, st):
         self.ss.save(st, self.KIND)
-        st.setValue('monitor/virt', self.virt.currentText())
+        st.setValue('vport/mode', self.cur_mode())
+        st.setValue('vport/virt', self.virt.currentText())
+        st.setValue('vport/a', self.ed_a.text())
+        st.setValue('vport/b', self.ed_b.text())
 
     def load_settings_into(self, st):
         self.ss.load(st, self.KIND)
-        v = st.value('monitor/virt', '')
+        i = self.mode_sel.findData(st.value('vport/mode', 'bridge'))
+        if i >= 0:
+            self.mode_sel.setCurrentIndex(i)
+        v = st.value('vport/virt', '')
         if v:
             self.virt.setEditText(v)
+        for key, ed in (('vport/a', self.ed_a), ('vport/b', self.ed_b)):
+            v = st.value(key, '')
+            if v:
+                ed.setText(v)
 
 
 # =========================================================================== ag araclari
@@ -3013,7 +3080,8 @@ class IperfTab(ToolTab):
 NET_TYPES = [NetConfigTab, PingTab, ScanTab, IperfTab]
 
 
-SESSION_TYPES = [SerialSession, TcpClientSession, TcpServerSession, UdpSession, MonitorSession]
+SESSION_TYPES = [SerialSession, MonitorSession, VirtualPortSession, TcpClientSession, TcpServerSession,
+                 UdpSession]
 ALL_TYPES = SESSION_TYPES + NET_TYPES
 
 
@@ -3253,6 +3321,11 @@ def tool_icon(kind, size=18):
         p.drawPath(path)
         p.setBrush(QtGui.QBrush(gr))
         p.drawEllipse(F(s / 2, s / 2), 2.4, 2.4)
+    elif kind == 'vport':         # birbirine bagli iki port
+        for x in (2.5, s - 8.5):
+            p.drawRoundedRect(R(x, s / 2 - 3, 6, 6), 1.2, 1.2)
+        p.drawLine(F(8.5, s / 2 - 1.2), F(s - 8.5, s / 2 - 1.2))
+        p.drawLine(F(8.5, s / 2 + 1.2), F(s - 8.5, s / 2 + 1.2))
     elif kind == 'netcfg':        # ethernet jaki
         path = QtGui.QPainterPath()
         path.moveTo(3, 4)
@@ -3573,7 +3646,7 @@ class UpdateDialog(W.QDialog):
         _bg(self, work, done)
 
 
-# =========================================================================== Terminator tarzi calisma alani
+# =========================================================================== bolmeli calisma alani
 def _icon(kind, color='#c9d1d9', size=16):
     """Basliktaki kucuk dugme ikonlari — her sistemde ayni gorunsun diye elle cizilir."""
     pm = QtGui.QPixmap(size, size)
@@ -3865,7 +3938,7 @@ class Workspace(W.QWidget):
         """pane'i bol, yeni bolmeye session'i (yoksa bos) koy. orient: 'h' yan yana, 'v' alt alta."""
         if self.zoomed is not None:
             self.toggle_zoom(self.zoomed)
-        if orient is None:     # Terminator gibi: uzun kenar yonunde bol
+        if orient is None:     # uzun kenar yonunde bol
             ms = pane.minimumSizeHint()
 
             def fits(p, o):    # iki yarisi da asgari boyutun ustunde kalir mi (pencere ekrandan tasmasin)
@@ -4149,7 +4222,7 @@ class Sidebar(W.QWidget):
                 plus = W.QToolButton()
                 plus.setIcon(_icon('plus', ACC))
                 plus.setAutoRaise(True)
-                plus.setToolTip(tx('Yeni {t}: aktif bolmenin YANINA ac (Terminator gibi)').replace('{t}', tx(cls.TITLE)))
+                plus.setToolTip(tx('Yeni {t}: aktif bolmenin YANINA ac').replace('{t}', tx(cls.TITLE)))
                 plus.clicked.connect(lambda _=False, c=cls: main.open_tool(c, split=True))
                 row.addWidget(b, 1)
                 row.addWidget(plus)
@@ -4215,7 +4288,7 @@ class MainWindow(W.QMainWindow):
         tb.addWidget(setb)
         tb.addAction(tr('About')).triggered.connect(self.about)
 
-        # sol panel (araclar) | sag: Terminator tarzi bolmeler
+        # sol panel (araclar) | sag: bolmeler
         self.ws = Workspace(self)
         self.sidebar = Sidebar(self)
         split = W.QSplitter(qenum(Qt, 'Orientation.Horizontal'))
@@ -4252,7 +4325,7 @@ class MainWindow(W.QMainWindow):
             except Exception:
                 pass
 
-    # -- kisayollar (Terminator ile ayni)
+    # -- kisayollar
     def _shortcuts(self):
         Act = getattr(QtGui, 'QAction', None) or getattr(W, 'QAction')
         for keys, fn in (('Ctrl+Shift+E', lambda: self.ws.split_pane(self.ws.active, 'h')),

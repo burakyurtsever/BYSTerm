@@ -135,6 +135,10 @@
   "en": " bytes)",
   "tr": " bayt)"
  },
+ " bir USB cihazi degil. Yerlesik COM portlari icin \"Sanal Port\" aracindaki kopruyu kullanin.": {
+  "en": " is not a USB device. For built-in COM ports use the bridge in the \"Virtual Port\" tool.",
+  "tr": " bir USB cihazı değil. Yerleşik COM portları için \"Sanal Port\" aracındaki köprüyü kullanın."
+ },
  " bir USB cihazi degil. Yerlesik COM portlari icin \"Sanal port koprusu\" yontemini kullanin.": {
   "en": " is not a USB device. For built-in COM ports use the \"Virtual port bridge\" method.",
   "tr": " bir USB cihazı değil. Yerleşik COM portları için \"Sanal port köprüsü\" yöntemini kullanın."
@@ -171,9 +175,17 @@
   "en": " ms   loss %",
   "tr": " ms   kayıp %"
  },
+ " port ayari: ": {
+  "en": " port settings: ",
+  "tr": " port ayarı: "
+ },
  " portuna erisim izniniz yok.\n\nIzin verilsin mi? (yonetici sifresi bir kez sorulur; kullaniciniz kalici olarak \"dialout\" grubuna da eklenir)": {
   "en": ": you do not have permission to access this port.\n\nGrant access? (the administrator password is asked once; your user is also permanently added to the \"dialout\" group)",
   "tr": " portuna erişim izniniz yok.\n\nİzin verilsin mi? (yönetici şifresi bir kez sorulur; kullanıcınız kalıcı olarak \"dialout\" grubuna da eklenir)"
+ },
+ " portunu acin.": {
+  "en": " in the other.",
+  "tr": " portunu açın."
  },
  " secili istemci": {
   "en": " selected client(s)",
@@ -235,9 +247,17 @@
   "en": ") to the real port: ",
   "tr": ") gerçek porta uygulanamadı: "
  },
+ ") portu acti; dinleniyor": {
+  "en": ") opened the port; capturing",
+  "tr": ") portu açtı; dinleniyor"
+ },
  ").\n\"Ek IP olarak ekle\" ile internetiniz bozulmadan cihaza ulasabilirsiniz.": {
   "en": ").\nWith \"Add as extra IP\" you can reach the device without breaking your internet.",
   "tr": ").\n\"Ek IP olarak ekle\" ile internetiniz bozulmadan cihaza ulaşabilirsiniz."
+ },
+ "). Bir uygulamada ": {
+  "en": "). Open ",
+  "tr": "). Bir uygulamada "
  },
  "). Diger uygulamada \"": {
   "en": "). Open \"",
@@ -259,9 +279,17 @@
   "en": ", address ",
   "tr": ", adres "
  },
+ ", digerinde ": {
+  "en": " in one application and ",
+  "tr": ", diğerinde "
+ },
  ". Diger uygulamada sanal ciftin OBUR ucunu acin.": {
   "en": ". Open the OTHER end of the virtual pair in the other application.",
   "tr": ". Diğer uygulamada sanal çiftin ÖBÜR ucunu açın."
+ },
+ ". Portu bir uygulama actiginda trafik burada gorunur. (Pasif dinleme)": {
+  "en": ". When an application opens the port, its traffic is shown here. (Passive capture)",
+  "tr": ". Portu bir uygulama açtığında trafik burada görünür. (Pasif dinleme)"
  },
  ". Uygulamak icin \"Uygula\" veya \"Ek IP olarak ekle\".": {
   "en": ". To apply, use \"Apply\" or \"Add as extra IP\".",
@@ -286,10 +314,6 @@
  ": IP sil ": {
   "en": ": remove IP ",
   "tr": ": IP sil "
- },
- ": aktif bolmenin YANINA ac (Terminator gibi)": {
-  "en": ": open NEXT TO the active pane (like Terminator)",
-  "tr": ": aktif bölmenin YANINA aç (Terminator gibi)"
  },
  ": baglanti / test calisiyor. Kapatilsin mi?": {
   "en": ": connection / test is running. Close it?",
@@ -331,6 +355,10 @@
   "en": ": option not allowed",
   "tr": ": izin verilmeyen seçenek"
  },
+ ": portu acan uygulama bekleniyor...": {
+  "en": ": waiting for an application to open the port...",
+  "tr": ": portu açan uygulama bekleniyor..."
+ },
  ": seçili pencerenin içeriğini buna çevir": {
   "en": ": switch the selected pane to this",
   "tr": ": seçili pencerenin içeriğini buna çevir"
@@ -346,6 +374,14 @@
  ": test hatasi: ": {
   "en": ": test error: ",
   "tr": ": test hatası: "
+ },
+ ": uygulama portu acti": {
+  "en": ": application opened the port",
+  "tr": ": uygulama portu açtı"
+ },
+ ": uygulama portu kapatti": {
+  "en": ": application closed the port",
+  "tr": ": uygulama portu kapattı"
  },
  ": zaman asimi": {
   "en": ": timeout",
@@ -499,6 +535,10 @@
   "en": "BREAK sent",
   "tr": "BREAK gönderildi"
  },
+ "BYSTerm gercek portu acar ve bir SANAL port olusturur (yukaridaki yol, orn. /tmp/ttyV0). Uygulamanizda gercek port yerine bu sanal portu acin; iki yondeki trafik burada gorunur ve oldugu gibi iletilir. (Gercek port baska uygulamada aciksa once onu kapatin.)": {
+  "en": "BYSTerm opens the real port and creates a VIRTUAL port (the path above, e.g. /tmp/ttyV0). Open this virtual port in your application instead of the real port; the traffic in both directions is shown here and passed through unchanged. (If the real port is open in another application, close it first.)",
+  "tr": "BYSTerm gerçek portu açar ve bir SANAL port oluşturur (yukarıdaki yol, örn. /tmp/ttyV0). Uygulamanızda gerçek port yerine bu sanal portu açın; iki yöndeki trafik burada görünür ve olduğu gibi iletilir. (Gerçek port başka uygulamada açıksa önce onu kapatın.)"
+ },
  "BYSTerm is a fast test and monitoring tool for embedded and network developers. It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, IP scanning and iperf3 speed tests together in one window with side-by-side panes. It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson without any installation.": {
   "en": "BYSTerm is a fast test and monitoring tool for embedded and network developers. It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, IP scanning and iperf3 speed tests together in one window with side-by-side panes. It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson without any installation.",
   "tr": "BYSTerm, gömülü sistem ve ağ geliştiricileri için hızlı bir test ve izleme aracıdır. Seri port, TCP, UDP, seri trafik izleme, ağ ayarları, ping, IP tarama ve iperf3 hız testini tek pencerede, yan yana bölmelerde toplar. Yüksek veri hızında donmaz; Windows, macOS, Linux ve NVIDIA Jetson üzerinde kurulum gerektirmeden çalışır."
@@ -567,6 +607,14 @@
   "en": "Installed once (free, signed). Windows must be restarted after installation.",
   "tr": "Bir kez kurulur (ücretsiz, imzalı). Kurulumdan sonra Windows yeniden başlatılmalı."
  },
+ "Bir sanal port cifti gerekir (com0com, orn. COM11<->COM12). BYSTerm gercek portu ve ciftin BIR ucunu (COM11) acar; uygulamanizda ciftin OBUR ucunu (COM12) acin. Trafik iki yonde iletilir ve gorunur.": {
+  "en": "A virtual port pair is required (com0com, e.g. COM11<->COM12). BYSTerm opens the real port and ONE end of the pair (COM11); open the OTHER end (COM12) in your application. Traffic is passed through and shown in both directions.",
+  "tr": "Bir sanal port çifti gerekir (com0com, örn. COM11<->COM12). BYSTerm gerçek portu ve çiftin BİR ucunu (COM11) açar; uygulamanızda çiftin ÖBÜR ucunu (COM12) açın. Trafik iki yönde iletilir ve görünür."
+ },
+ "Birbirine bagli iki sanal port olusturulur (A ve B). Bir uygulamada A'yi, digerinde B'yi acin: birinin yazdigi digerine gider, iki yondeki trafik burada gorunur.": {
+  "en": "Two connected virtual ports are created (A and B). Open A in one application and B in another: what one writes goes to the other, and the traffic in both directions is shown here.",
+  "tr": "Birbirine bağlı iki sanal port oluşturulur (A ve B). Bir uygulamada A'yı, diğerinde B'yi açın: birinin yazdığı diğerine gider, iki yöndeki trafik burada görünür."
+ },
  "Bit": {
   "en": "Bits",
   "tr": "Bit"
@@ -603,17 +651,33 @@
   "en": "Extra IP addresses on this adapter",
   "tr": "Bu karttaki ek IP adresleri"
  },
+ "Bu modda gonderme yok": {
+  "en": "No sending in this mode",
+  "tr": "Bu modda gönderme yok"
+ },
  "Bu sistemde ping atilamiyor": {
   "en": "Cannot ping on this system",
   "tr": "Bu sistemde ping atılamıyor"
  },
+ "Bu sistemde port dinleme desteklenmiyor. \"Sanal Port\" aracindaki kopruyu kullanin.": {
+  "en": "Port capture is not supported on this system. Use the bridge in the \"Virtual Port\" tool.",
+  "tr": "Bu sistemde port dinleme desteklenmiyor. \"Sanal Port\" aracındaki köprüyü kullanın."
+ },
+ "Bu sistemde port dinleme desteklenmiyor. Trafigi gormek icin \"Sanal Port\" aracindaki kopruyu kullanin.": {
+  "en": "Port capture is not supported on this system. To see the traffic, use the bridge in the \"Virtual Port\" tool.",
+  "tr": "Bu sistemde port dinleme desteklenmiyor. Trafiği görmek için \"Sanal Port\" aracındaki köprüyü kullanın."
+ },
+ "Bu sistemde seri port dinleme desteklenmiyor": {
+  "en": "Serial port capture is not supported on this system",
+  "tr": "Bu sistemde seri port dinleme desteklenmiyor"
+ },
+ "Bu yontem Linux/macOS icindir": {
+  "en": "This method is for Linux/macOS",
+  "tr": "Bu yöntem Linux/macOS içindir"
+ },
  "CANLI DINLEME (Linux/Jetson): Portu BASKA bir uygulama acsa bile (orn. minicom, kendi programiniz), o uygulamanin seri trafigini SANAL PORT OLMADAN burada gorursunuz; izlenen uygulama hic degismez, veriye dokunulmaz (pasif). Listeden uygulamayi secip baslatin. Yetki gerekirse yonetici izni istenir.": {
   "en": "LIVE CAPTURE (Linux/Jetson): Even if ANOTHER application opens the port (e.g. minicom, your own program), you see that application's serial traffic here WITHOUT A VIRTUAL PORT; the monitored application is not changed at all and the data is not touched (passive). Select the application from the list and start. Admin rights are requested if needed.",
   "tr": "CANLI DİNLEME (Linux/Jetson): Portu BAŞKA bir uygulama açsa bile (örn. minicom, kendi programınız), o uygulamanın seri trafiğini SANAL PORT OLMADAN burada görürsünüz; izlenen uygulama hiç değişmez, veriye dokunulmaz (pasif). Listeden uygulamayı seçip başlatın. Yetki gerekirse yönetici izni istenir."
- },
- "CANLI DINLEME (Windows, Eltima gibi): Portu BASKA bir uygulama acmisken bile o porttaki trafigi SANAL PORT OLMADAN gorursunuz; o uygulama hic degismez, BYSTerm porta dokunmaz. Gelen/giden veri, uygulamanin sectigi baud/format ve DTR/RTS degisiklikleri gorunur. USB-seri ceviriciler icindir (FTDI, CP210x, CH340, PL2303, Arduino/STM32/ESP32 gibi USB CDC). Bir kez ucretsiz USBPcap surucusu kurulur (Wireshark da kullanir, Microsoft imzali). Anakart uzerindeki yerlesik COM portlari icin \"Sanal port koprusu\" yontemini kullanin.": {
-  "en": "LIVE CAPTURE (Windows, like Eltima): See the traffic of a port even while ANOTHER application has it open, WITHOUT A VIRTUAL PORT; that application is not changed at all and BYSTerm never touches the port. Incoming/outgoing data, the baud/format the application selects and DTR/RTS changes are shown. For USB serial adapters (FTDI, CP210x, CH340, PL2303, USB CDC such as Arduino/STM32/ESP32). The free USBPcap driver is installed once (also used by Wireshark, Microsoft-signed). For built-in motherboard COM ports use the \"Virtual port bridge\" method.",
-  "tr": "CANLI DİNLEME (Windows, Eltima gibi): Portu BAŞKA bir uygulama açmışken bile o porttaki trafiği SANAL PORT OLMADAN görürsünüz; o uygulama hiç değişmez, BYSTerm porta dokunmaz. Gelen/giden veri, uygulamanın seçtiği baud/format ve DTR/RTS değişiklikleri görünür. USB-seri çeviriciler içindir (FTDI, CP210x, CH340, PL2303, Arduino/STM32/ESP32 gibi USB CDC). Bir kez ücretsiz USBPcap sürücüsü kurulur (Wireshark da kullanır, Microsoft imzalı). Anakart üzerindeki yerleşik COM portları için \"Sanal port köprüsü\" yöntemini kullanın."
  },
  "CIHAZ>": {
   "en": "DEVICE>",
@@ -622,10 +686,6 @@
  "Cancel": {
   "en": "Cancel",
   "tr": "İptal"
- },
- "Canli dinleme (USB-seri, Eltima gibi)": {
-  "en": "Live capture (USB serial, like Eltima)",
-  "tr": "Canlı dinleme (USB-seri, Eltima gibi)"
  },
  "Canli dinleme (calisan uygulamayi izle)": {
   "en": "Live capture (monitor a running application)",
@@ -679,6 +739,10 @@
   "en": "No DHCP client found (dhclient/dhcpcd/udhcpc)",
   "tr": "DHCP istemcisi bulunamadı (dhclient/dhcpcd/udhcpc)"
  },
+ "DONANIM TAP: Iki USB-seri cevirici; A ve B portlarinin RX uclari izlenen hattin TX ve RX'ine baglanir. BYSTerm ikisini de sadece dinler, hatta hicbir sey gondermez. GND'leri ortak baglayin.": {
+  "en": "HARDWARE TAP: Two USB serial adapters; the RX pins of ports A and B are connected to the TX and RX of the monitored line. BYSTerm only listens on both and never sends anything to the line. Connect the GNDs together.",
+  "tr": "DONANIM TAP: İki USB-seri çevirici; A ve B portlarının RX uçları izlenen hattın TX ve RX'ine bağlanır. BYSTerm ikisini de sadece dinler, hatta hiçbir şey göndermez. GND'leri ortak bağlayın."
+ },
  "Dark": {
   "en": "Dark",
   "tr": "Koyu"
@@ -723,9 +787,25 @@
   "en": "No sending in listen mode (passive)",
   "tr": "Dinleme modunda gönderme yok (pasif)"
  },
+ "Dinlemeyi baslat": {
+  "en": "Start capture",
+  "tr": "Dinlemeyi başlat"
+ },
+ "Dinlenecek port (COM3, /dev/ttyUSB0)": {
+  "en": "Port to capture (COM3, /dev/ttyUSB0)",
+  "tr": "Dinlenecek port (COM3, /dev/ttyUSB0)"
+ },
+ "Dinlenecek portu secin": {
+  "en": "Select the port to capture",
+  "tr": "Dinlenecek portu seçin"
+ },
  "Dinleniyor: ": {
   "en": "Listening: ",
   "tr": "Dinleniyor: "
+ },
+ "Donanim tap: iki gercek portu dinle": {
+  "en": "Hardware tap: capture two real ports",
+  "tr": "Donanım tap: iki gerçek portu dinle"
  },
  "Dosya gonder...": {
   "en": "Send file...",
@@ -1007,6 +1087,10 @@
   "en": "IPv4 address(es)",
   "tr": "IPv4 adres(ler)"
  },
+ "Iki farkli sanal port yolu girin": {
+  "en": "Enter two different virtual port paths",
+  "tr": "İki farklı sanal port yolu girin"
+ },
  "Ikinci port (B)": {
   "en": "Second port (B)",
   "tr": "İkinci port (B)"
@@ -1158,6 +1242,14 @@
  "Kontrol karakteri <XX>": {
   "en": "Control chars <XX>",
   "tr": "Kontrol karakteri <XX>"
+ },
+ "Kopru kuruldu: ": {
+  "en": "Bridge started: ",
+  "tr": "Köprü kuruldu: "
+ },
+ "Kopru: gercek port ↔ sanal port": {
+  "en": "Bridge: real port ↔ virtual port",
+  "tr": "Köprü: gerçek port ↔ sanal port"
  },
  "Kopyalandi: ": {
   "en": "Copied: ",
@@ -1319,9 +1411,21 @@
   "en": "Add to Ping tab",
   "tr": "Ping sekmesine ekle"
  },
+ "Port A": {
+  "en": "Port A",
+  "tr": "Port A"
+ },
+ "Port B": {
+  "en": "Port B",
+  "tr": "Port B"
+ },
  "Port baglantisi koptu: ": {
   "en": "Port connection lost: ",
   "tr": "Port bağlantısı koptu: "
+ },
+ "Port listesini simdi yenile": {
+  "en": "Refresh the port list now",
+  "tr": "Port listesini şimdi yenile"
  },
  "Port listesini simdi yenile (liste zaten otomatik yenilenir)": {
   "en": "Refresh the port list now (the list also refreshes automatically)",
@@ -1342,6 +1446,22 @@
  "Portlari yeniden tara": {
   "en": "Rescan ports",
   "tr": "Portları yeniden tara"
+ },
+ "Portu baska bir uygulama kullanirken o porttaki trafigi gosterir; o uygulama hic degismez, BYSTerm porta dokunmaz. Gelen/giden veri, uygulamanin sectigi baud/format ve DTR/RTS degisiklikleri gorunur. USB-seri ceviriciler icindir (FTDI, CP210x, CH340, PL2303, Arduino/STM32/ESP32 gibi USB CDC cihazlar). Bir kez ucretsiz USBPcap surucusu kurulur. Anakart uzerindeki yerlesik COM portlari icin \"Sanal Port\" aracindaki kopruyu kullanin.": {
+  "en": "Shows the traffic of a port while another application is using it; that application is not changed at all and BYSTerm never touches the port. Incoming/outgoing data, the baud/format the application selects and DTR/RTS changes are shown. For USB serial adapters (FTDI, CP210x, CH340, PL2303, USB CDC devices such as Arduino/STM32/ESP32). The free USBPcap driver is installed once. For built-in motherboard COM ports use the bridge in the \"Virtual Port\" tool.",
+  "tr": "Portu başka bir uygulama kullanırken o porttaki trafiği gösterir; o uygulama hiç değişmez, BYSTerm porta dokunmaz. Gelen/giden veri, uygulamanın seçtiği baud/format ve DTR/RTS değişiklikleri görünür. USB-seri çeviriciler içindir (FTDI, CP210x, CH340, PL2303, Arduino/STM32/ESP32 gibi USB CDC cihazlar). Bir kez ücretsiz USBPcap sürücüsü kurulur. Anakart üzerindeki yerleşik COM portları için \"Sanal Port\" aracındaki köprüyü kullanın."
+ },
+ "Portu baska bir uygulama kullanirken o porttaki trafigi gosterir; o uygulama hic degismez, BYSTerm porta dokunmaz. Uygulama portu sonradan acsa, kapatip yeniden acsa ya da baska bir uygulama acsa da dinleme kendiliginden devam eder. Yetki gerekirse yonetici izni istenir.": {
+  "en": "Shows the traffic of a port while another application is using it; that application is not changed at all and BYSTerm never touches the port. Capture continues automatically if the application opens the port later, closes and reopens it, or another application opens it. Admin permission is requested if needed.",
+  "tr": "Portu başka bir uygulama kullanırken o porttaki trafiği gösterir; o uygulama hiç değişmez, BYSTerm porta dokunmaz. Uygulama portu sonradan açsa, kapatıp yeniden açsa ya da başka bir uygulama açsa da dinleme kendiliğinden devam eder. Yetki gerekirse yönetici izni istenir."
+ },
+ "Portu kullanan: ": {
+  "en": "Port in use by: ",
+  "tr": "Portu kullanan: "
+ },
+ "Portu su an kullanan uygulama yok (baslatinca beklenir)": {
+  "en": "No application is using the port right now (capture will wait for one)",
+  "tr": "Portu şu an kullanan uygulama yok (başlatınca beklenir)"
  },
  "PowerShell cikti vermedi: ": {
   "en": "PowerShell returned no output: ",
@@ -1395,6 +1515,10 @@
   "en": "Specify a virtual / second port",
   "tr": "Sanal / ikinci port belirtin"
  },
+ "Sanal Port": {
+  "en": "Virtual Port",
+  "tr": "Sanal Port"
+ },
  "Sanal arayuzleri de goster (VPN, Docker, Hyper-V...)": {
   "en": "Also show virtual interfaces (VPN, Docker, Hyper-V...)",
   "tr": "Sanal arayüzleri de göster (VPN, Docker, Hyper-V...)"
@@ -1402,6 +1526,18 @@
  "Sanal port": {
   "en": "Virtual port",
   "tr": "Sanal port"
+ },
+ "Sanal port cifti (iki uygulamayi birbirine bagla)": {
+  "en": "Virtual port pair (connect two applications)",
+  "tr": "Sanal port çifti (iki uygulamayı birbirine bağla)"
+ },
+ "Sanal port cifti hazir: ": {
+  "en": "Virtual port pair ready: ",
+  "tr": "Sanal port çifti hazır: "
+ },
+ "Sanal port cifti icin bir kez kurulur (ucretsiz).": {
+  "en": "Installed once for virtual port pairs (free).",
+  "tr": "Sanal port çifti için bir kez kurulur (ücretsiz)."
  },
  "Sanal port hatasi: ": {
   "en": "Virtual port error: ",
@@ -1711,6 +1847,10 @@
   "en": "Application changed port settings -> real port: ",
   "tr": "Uygulama port ayarını değiştirdi -> gerçek port: "
  },
+ "Uygulama portu birakti: ": {
+  "en": "Application released the port: ",
+  "tr": "Uygulama portu bıraktı: "
+ },
  "Uygulama sanal portu acti": {
   "en": "Application opened the virtual port",
   "tr": "Uygulama sanal portu açtı"
@@ -1738,6 +1878,14 @@
  "What&#39;s new:": {
   "en": "What&#39;s new:",
   "tr": "Yenilikler:"
+ },
+ "Windows'ta sanal port cifti com0com surucusuyle olusturulur (orn. COM11 <-> COM12): bir uygulama COM11'i, digeri COM12'yi acar ve birbirleriyle konusur. Ciftler kalicidir. Trafigi BYSTerm'de gormek icin \"Kopru\" yontemini kullanin.": {
+  "en": "On Windows, a virtual port pair is created with the com0com driver (e.g. COM11 <-> COM12): one application opens COM11, the other COM12, and they talk to each other. Pairs are permanent. To see the traffic in BYSTerm, use the \"Bridge\" method.",
+  "tr": "Windows'ta sanal port çifti com0com sürücüsüyle oluşturulur (örn. COM11 <-> COM12): bir uygulama COM11'i, diğeri COM12'yi açar ve birbirleriyle konuşur. Çiftler kalıcıdır. Trafiği BYSTerm'de görmek için \"Köprü\" yöntemini kullanın."
+ },
+ "Windows'ta sanal port ciftini \"Yeni sanal port cifti olustur\" ile olusturun": {
+  "en": "On Windows, create a virtual port pair with \"Create new virtual port pair\"",
+  "tr": "Windows'ta sanal port çiftini \"Yeni sanal port çifti oluştur\" ile oluşturun"
  },
  "Windows: uygulama yonetici olarak calistirilir": {
   "en": "Windows: the application is run as administrator",
@@ -1775,9 +1923,9 @@
   "en": "Create new virtual port pair",
   "tr": "Yeni sanal port çifti oluştur"
  },
- "Yeni {t}: aktif bolmenin YANINA ac (Terminator gibi)": {
-  "en": "New {t}: open NEXT TO the active pane (like Terminator)",
-  "tr": "Yeni {t}: aktif bölmenin YANINA aç (Terminator gibi)"
+ "Yeni {t}: aktif bolmenin YANINA ac": {
+  "en": "New {t}: open NEXT TO the active pane",
+  "tr": "Yeni {t}: aktif bölmenin YANINA aç"
  },
  "Yerel": {
   "en": "Local",

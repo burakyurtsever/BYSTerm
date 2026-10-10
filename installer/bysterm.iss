@@ -5,7 +5,7 @@
 ; BYSTerm'i Program Files'a kurar, Baslat menusu + (istege bagli) masaustu kisayolu, kaldirici ekler.
 ; WithCom0com tanimliysa, seri port izleme icin ucretsiz/imzali com0com sanal null-modem surucusunu
 ; (kullanici onayiyla, sessizce) kurar. com0com olmadan da kurulum sorunsuz tamamlanir.
-; WithUSBPcap tanimliysa, Eltima tarzi "canli dinleme" (sanal port olmadan USB-seri trafigi) icin
+; WithUSBPcap tanimliysa, Seri Izleme (sanal port olmadan USB-seri trafigini dinleme) icin
 ; USBPcap'in resmi, Microsoft imzali kurulumunu (GPLv2, kaynak: github.com/desowin/usbpcap) calistirir.
 
 #ifndef AppVersion
@@ -48,10 +48,10 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 tr.Extras=Ek bileşenler:
 en.Extras=Additional components:
-tr.TaskUSBPcap=Canlı seri port dinleme (Eltima gibi, sanal port olmadan) için USBPcap sürücüsünü kur — yeniden başlatma gerekir
-en.TaskUSBPcap=Install the USBPcap driver for live serial port capture (like Eltima, no virtual port) — restart required
-tr.TaskCom0com=Sanal port köprüsü için com0com sürücüsünü kur
-en.TaskCom0com=Install the com0com driver for the virtual port bridge
+tr.TaskUSBPcap=Seri port dinleme (Seri İzleme) için USBPcap sürücüsünü kur — yeniden başlatma gerekir
+en.TaskUSBPcap=Install the USBPcap driver for serial port capture (Serial Monitor) — restart required
+tr.TaskCom0com=Sanal port için com0com sürücüsünü kur
+en.TaskCom0com=Install the com0com driver for virtual ports
 tr.InstUSBPcap=USB dinleme sürücüsü (USBPcap) kuruluyor...
 en.InstUSBPcap=Installing USB capture driver (USBPcap)...
 tr.InstCom0com=Sanal seri port sürücüsü kuruluyor...
@@ -94,7 +94,7 @@ Filename: "{tmp}\com0com\setup.exe"; Parameters: "/S"; StatusMsg: "{cm:InstCom0c
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; com0com / USBPcap'i BYSTerm kaldirilirken SILMEYIZ (Wireshark gibi baska uygulamalar kullaniyor olabilir).
+; com0com / USBPcap'i BYSTerm kaldirilirken SILMEYIZ (baska uygulamalar da kullaniyor olabilir).
 
 [Code]
 function InitializeSetup(): Boolean;

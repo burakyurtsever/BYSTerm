@@ -2,17 +2,18 @@
 
 # BYSTerm — Seri / TCP / UDP hızlı test ve izleme aracı
 
-Hercules'in sadeliği + Eltima Serial Port Monitor'ün izleme özelliği, tek uygulamada.
+Seri port, TCP, UDP, seri port dinleme, sanal port ve ağ araçları tek uygulamada.
 **Windows, macOS, Linux (Ubuntu, NVIDIA Jetson dahil)** üzerinde aynı kodla çalışır.
 SSH/telnet yok, gereksiz menü yok: aç, portu seç, bak.
 
 | Sekme | Ne yapar |
 |---|---|
 | **Seri** | Aktif portları **isim/açıklama/VID:PID** ile listeler (takıp çıkarınca otomatik yenilenir), standart baud listesi (elle de yazılır), 5–8 bit, parity, stop, akış kontrolü, DTR/RTS, BREAK, CTS/DSR/DCD/RI göstergeleri |
+| **Seri İzleme** | Sadece portu seç: portu **başka bir uygulama** kullanırken iki yöndeki trafiği gör (sanal port yok) — aşağıya bakın |
+| **Sanal Port** | Gerçek port ↔ sanal port köprüsü, birbirine bağlı sanal port çifti, iki portla donanım tap |
 | **TCP İstemci** | host:port'a bağlan, gönder/al |
 | **TCP Sunucu** | Dinle, bağlı istemcileri listele, **hepsine veya seçilene** gönder, istemciyi at |
 | **UDP** | Yerel porttan dinle, hedefe gönder, gelen paketin kaynağını göster, "son gönderene yanıtla", broadcast |
-| **Seri İzleme** | **Başka bir uygulamanın** seri trafiğini iki yönlü izle (Eltima gibi) — aşağıya bakın |
 | **Ağ Ayarları** | PC'deki tüm ağ kartlarını listele (Ethernet 1/2/3, Wi-Fi: bağlantı, hız, IP/maske, gateway, DNS, DHCP/statik, MAC). Seçtiğin kartın **IP / maske / gateway / DNS**'ini değiştir veya DHCP'ye al. **Ek IP ekle**: mevcut IP (ve internet) bozulmadan karta cihazın alt ağından ikinci bir IP. **Otomatik IP**: cihazın IP'sini yaz, o ağda boş IP bulunsun. **Profiller**: "Jetson ağı" gibi ayarları kaydet, tek tıkla yükle |
 | **Ping** | Sürekli ping, aynı anda birden fazla hedef: kayıp %, son/ort/min/max/jitter, canlı grafik. Cihaz **cevap vermeye başlayınca / kesilince** satır vurgulanır (isteğe bağlı bip) |
 | **IP Tarama** | Alt ağı tara: cevap veren cihazların IP, süre, MAC, host adı ve TTL'den tahmini sistemi. Sağ tık → Ping'e ekle / iPerf / TCP hedefi yap |
@@ -24,7 +25,7 @@ ASCII (`\r \n \t \xHH` kaçışlı) veya HEX gönderme, satır sonu (CR / LF / C
 gönderim geçmişi (↑/↓), **periyodik tekrar** (ms), dosya gönder. Aynı türden istediğiniz
 kadar bölme açabilirsiniz (soldaki listede araç adının yanındaki **+**). Son ayarlar hatırlanır.
 
-**Pencereler (Terminator gibi):** soldaki araç adına tıklamak seçili bölmenin içeriğini o araca
+**Pencereler:** soldaki araç adına tıklamak seçili bölmenin içeriğini o araca
 çevirir; **+** yanına yeni bölme açar. Bölmeleri başlığından tutup sürükleyerek başka bir bölmenin
 sağına/soluna/üstüne/altına bırakabilir, aradaki çizgiyle büyütüp küçültebilirsiniz.
 
@@ -39,7 +40,7 @@ Python, pip ya da başka bir kütüphane **gerekmez**; her şey dosyanın içind
 
 | Sistem | Dosya | Nasıl açılır |
 |---|---|---|
-| **Windows** 10 / 11 — kurulum (önerilen) | `BYSTerm-Setup-windows-x64.exe` | Çift tıklayıp kurun. Başlat menüsüne eklenir; Eltima tarzı canlı seri izleme için USBPcap sürücüsünü de isteğe bağlı kurar. İlk açılışta "Windows bilgisayarınızı korudu" çıkarsa *Ek bilgi → Yine de çalıştır* (imzasız). |
+| **Windows** 10 / 11 — kurulum (önerilen) | `BYSTerm-Setup-windows-x64.exe` | Çift tıklayıp kurun. Başlat menüsüne eklenir; Seri İzleme için USBPcap sürücüsünü de isteğe bağlı kurar. İlk açılışta "Windows bilgisayarınızı korudu" çıkarsa *Ek bilgi → Yine de çalıştır* (imzasız). |
 | **Windows** 10 / 11 — taşınabilir | `BYSTerm-windows-x64.exe` | Kurulumsuz tek dosya. Çift tıklayın. |
 | **macOS** Apple Silicon (M1–M4) | `BYSTerm-macos-arm64.zip` | Zip'i açın, `BYSTerm.app`'i Uygulamalar'a sürükleyin. İlk açılışta *sağ tık → Aç* (imzasız). Olmazsa Terminal'de: `xattr -dr com.apple.quarantine /Applications/BYSTerm.app` |
 | **macOS** Intel | `BYSTerm-macos-x64.zip` | Aynı şekilde |
@@ -78,8 +79,8 @@ Reddederseniz uygulama normal çalışır; IP değiştirirken tekrar sorulur. A�
 
 ## Yüksek veri hızında donmaz
 
-Hercules'in yüksek hızda kilitlenmesinin sebebi dil değil, gelen her parçada ekranı yeniden
-çizmesidir. BYSTerm'ta:
+Terminal uygulamaları yüksek hızda genellikle gelen her parçada ekranı yeniden çizdikleri için
+kilitlenir. BYSTerm'da:
 
 * Okuma/yazma ayrı thread'lerde yapılır; arayüz hiçbir zaman port/soket üzerinde beklemez.
 * Ekran 40 ms'de bir **toplu** güncellenir ve tik başına bir bayt bütçesi vardır.
@@ -98,40 +99,46 @@ Hercules'in yüksek hızda kilitlenmesinin sebebi dil değil, gelen her parçada
 
 Gerçek bir UART 3 Mbaud'da bile ~0.3 MB/s'dir, yani bu sınırın çok altında kalır.
 
-## Seri İzleme (başka uygulamanın trafiğini görmek)
+## Seri İzleme (portu dinlemek)
 
-Üç yöntem var; **Seri İzleme** penceresinin üstündeki "Yöntem" listesinden seçilir.
-
-**1) Canlı dinleme — Eltima gibi, sanal port yok (önerilen):**
-Portu BAŞKA bir uygulama açmış olsa bile (kendi programın, terminal, ROS düğümü…) onun seri
-trafiğini olduğu gibi görürsün. İzlenen uygulama hiç değişmez, BYSTerm porta dokunmaz (tamamen pasif).
-`CIHAZ>` = cihazdan gelen, `UYGUL>` = uygulamanın gönderdiği.
+Sadece **portu seçip** başlatırsın. Portu BAŞKA bir uygulama kullanırken (kendi programın, terminal,
+ROS düğümü…) iki yöndeki trafiği olduğu gibi görürsün. O uygulama hiç değişmez, BYSTerm porta
+dokunmaz, sanal port yoktur (tamamen pasif). `CIHAZ>` = cihazdan gelen, `UYGUL>` = uygulamanın gönderdiği.
 
 - **Windows:** USB-seri çeviriciler için (FTDI, CP210x, CH340/CH341, PL2303 ve Arduino / STM32 /
-  ESP32 / Pico gibi USB CDC cihazlar). Listeden COM portunu seç, başlat. Gelen/giden verinin yanında
-  uygulamanın seçtiği **baud / format** (ör. `115200 baud 8N1`), **DTR/RTS** değişiklikleri ve hat
-  hataları (çerçeve, parite, BREAK) da görünür. Bunun için bir kez ücretsiz **USBPcap** sürücüsü
-  kurulur (kurulum programında tek tik ya da Seri İzleme'deki düğme; sonra Windows bir kez yeniden
-  başlatılır). USBPcap, Wireshark'ın da kullandığı Microsoft imzalı bir USB yakalama sürücüsüdür
-  (GPL-2.0, kaynak: [github.com/desowin/usbpcap](https://github.com/desowin/usbpcap)).
-  Anakart üzerindeki yerleşik COM portları USB olmadığı için onlarda 2. yöntem kullanılır.
-- **Linux / Jetson:** Listeden seri port açmış uygulamayı seç, başlat. Sürücü gerekmez; çekirdeğin
-  `ptrace` yetkisi kullanılır, gerekirse yönetici izni istenir (`sudo apt install strace`).
+  ESP32 / Pico gibi USB CDC cihazlar). Gelen/giden verinin yanında uygulamanın seçtiği
+  **baud / format** (ör. `115200 baud 8N1`), **DTR/RTS** değişiklikleri ve hat hataları (çerçeve,
+  parite, BREAK) da görünür. Bunun için bir kez ücretsiz **USBPcap** sürücüsü kurulur (kurulum
+  programında tek tik ya da Seri İzleme'deki düğme; sonra Windows bir kez yeniden başlatılır).
+  USBPcap, Microsoft imzalı bir USB yakalama sürücüsüdür (GPL-2.0, kaynak:
+  [github.com/desowin/usbpcap](https://github.com/desowin/usbpcap)). Anakart üzerindeki yerleşik
+  COM portları USB olmadığı için onlarda **Sanal Port → Köprü** kullanılır.
+- **Linux / Jetson:** Portu hangi uygulama açarsa onun trafiği gösterilir; uygulama portu sonradan
+  açsa, kapatıp yeniden açsa ya da başka bir uygulama açsa da dinleme kendiliğinden sürer. Sürücü
+  gerekmez; çekirdeğin `ptrace` yetkisi kullanılır, gerekirse yönetici izni istenir
+  (`sudo apt install strace`).
+- **macOS:** port dinleme yok; **Sanal Port → Köprü** kullanılır.
 
-**2) Sanal port köprüsü (tüm sistemler, her tür port):**
-BYSTerm gerçek portu açar ve bir sanal port oluşturur; izlemek istediğin uygulamada gerçek port
-yerine bu sanal portu açarsın. Linux/macOS'ta sanal port otomatik (`/tmp/ttyV0`). **Windows'ta**
-bir sanal null-modem çifti gerekir (**com0com**, Seri İzleme'deki düğmeyle kurulur): izlenen
+> Nasıl çalışır (Windows): USBPcap, USB sürücü yığınına takılan bir filtre sürücüsüdür ve USB-seri
+> çeviriciye giden/gelen her paketi kopyalar; BYSTerm bunlardan seri veriyi ve port ayarlarını çözer.
+
+## Sanal Port
+
+**Sanal Port** aracındaki "Yöntem" listesinden seçilir:
+
+**1) Köprü: gerçek port ↔ sanal port** — BYSTerm gerçek portu açar ve bir sanal port oluşturur;
+uygulamanda gerçek port yerine bu sanal portu açarsın. İki yöndeki trafik iletilir ve görünür.
+Linux/macOS'ta sanal port otomatik (`/tmp/ttyV0`); uygulamanın seçtiği baud/format gerçek porta
+uygulanır. **Windows'ta** bir sanal port çifti gerekir (**com0com**, aynı ekrandaki düğmeyle kurulur):
 uygulamada çiftin bir ucunu, BYSTerm'de diğer ucunu açarsın.
 
-**3) Pasif donanım tap:**
-İki USB-seri çeviricinin RX uçlarını hattın TX ve RX'ine bağlarsın; BYSTerm ikisini de sadece
-dinler (`A>` / `B>`). İzlenen cihazlara hiç dokunmaz.
+**2) Sanal port çifti** — birbirine bağlı iki sanal port (A ↔ B). Bir uygulamada A'yı, diğerinde
+B'yi açarsın; birinin yazdığı diğerine gider. Linux/macOS'ta trafik BYSTerm'de görünür
+(`A>` / `B>`), iki tarafın seçtiği baud/format da yazılır. Windows'ta çift com0com ile oluşturulur
+("Yeni sanal port çifti oluştur") ve kalıcıdır.
 
-> Nasıl çalışır: Eltima Serial Port Monitor, seri port sürücüsünün üstüne kendi imzalı çekirdek
-> filtre sürücüsünü takar ve porttan geçen her isteği kopyalar. BYSTerm Windows'ta aynı işi USB
-> katmanında yapar: USBPcap da bir filtre sürücüsüdür, USB-seri çeviriciye giden/gelen her paketi
-> kopyalar; BYSTerm bunlardan seri veriyi ve port ayarlarını çözer.
+**3) Donanım tap: iki gerçek portu dinle** — iki USB-seri çeviricinin RX uçlarını hattın TX ve RX'ine
+bağlarsın; BYSTerm ikisini de sadece dinler (`A>` / `B>`), hatta hiçbir şey göndermez.
 
 ## Kaynaktan çalıştırma / derleme (geliştirici için)
 

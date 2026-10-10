@@ -1,12 +1,10 @@
 """
-Windows'ta Eltima tarzi seri port izleme: SANAL PORT YOK, izlenen uygulama hic degismez.
+Windows'ta seri port dinleme: SANAL PORT YOK, portu kullanan uygulama hic degismez.
 
-Eltima Serial Port Monitor, seri port surucusunun ustune kendi (Microsoft imzali) cekirdek filtre
-surucusunu takar. Ayni seyi USB-seri ceviriciler (FTDI, CP210x, CH340/CH341, PL2303, CDC-ACM:
-Arduino, STM32 VCP, ESP32, Pico...) icin USBPcap ile yapiyoruz: USBPcap da imzali bir filtre
-surucusudur (Wireshark'in USB yakalamasi), USB veri yolundan gecen her paketi kopyalar.
-Biz bu akistan cihazin seri verisini (RX/TX), baud/format ayarlarini ve DTR/RTS gibi hat
-degisikliklerini cikaririz.
+USB-seri ceviriciler (FTDI, CP210x, CH340/CH341, PL2303, CDC-ACM: Arduino, STM32 VCP, ESP32,
+Pico...) icin USBPcap kullanilir: USBPcap, USB surucu yiginina takilan imzali bir filtre
+surucusudur ve USB veri yolundan gecen her paketi kopyalar. Bu akistan cihazin seri verisini
+(RX/TX), baud/format ayarlarini ve DTR/RTS gibi hat degisikliklerini cikaririz.
 
     USBPcapCMD.exe -d \\\\.\\USBPcap1 --devices 5 --inject-descriptors -o -   ->  pcap (DLT 249) stdout
 

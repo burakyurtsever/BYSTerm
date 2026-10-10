@@ -178,7 +178,7 @@ class Decoders(unittest.TestCase):
     def test_pcap_stream_errors_and_pcapng(self):
         with self.assertRaises(ValueError):
             u.PcapStream().feed(b'NOTAPCAPFILE' * 3)
-        # pcapng (Wireshark'in kaydettigi bicim) de okunur
+        # pcapng bicimi de okunur
         shb = struct.pack('<IIIHHq', 0x0A0D0D0A, 28, 0x1A2B3C4D, 1, 0, -1) + struct.pack('<I', 28)
         idb = struct.pack('<IIHHI', 1, 20, 249, 0, 65535) + struct.pack('<I', 20)
         p = rec(1, 0x81, u.TR_BULK, True, b'x')

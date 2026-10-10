@@ -235,6 +235,106 @@ class NetTools(unittest.TestCase):
             except OSError:
                 pass
 
+    @unittest.skipUnless(c.IS_LINUX, 'Linux')
+    def test_port_sniffer_follows_apps(self):
+        """Sadece port secilir: uygulama SONRA acar, kapatip yeniden acar, baska uygulama acar -> hep dinlenir."""
+        import tty as _tty
+        import subprocess as _sp
+        if not c.which('strace'):
+            self.skipTest('strace yok')
+        mas, slv = os.openpty()
+        _tty.setraw(slv)
+        dev = os.ttyname(slv)
+        code = ('import os,sys,time;'
+                'fd=os.open(sys.argv[1], os.O_RDWR);'
+                'os.write(fd, sys.argv[2].encode());'
+                'end=time.time()+float(sys.argv[3])\n'
+                'while time.time()<end:\n'
+                ' import select\n'
+                ' r,_,_=select.select([fd],[],[],0.1)\n'
+                ' if r: os.read(fd, 64)\n')
+        sn = c.PortSniffer(dev)
+        sn.start()
+        apps = []
+        try:
+            self.assertTrue(wait(lambda: has(sn, 'state', 'open') or has(sn, 'closed'), 3))
+            if has(sn, 'closed'):
+                self.skipTest('dinleme acilamadi')
+            time.sleep(0.6)                                  # once hicbir uygulama yok -> bekler
+            self.assertTrue(any('bekleniyor' in e[3] for e in list(sn.events) if e[0] == 'info'))
+            apps.append(_sp.Popen(['python3', '-c', code, dev, 'APP1>', '4']))
+            if not wait(lambda: any(e[0] == 'info' and 'dinleniyor' in e[3] for e in list(sn.events)), 6):
+                self.skipTest('strace baglanamadi (ptrace yetkisi?)')
+            time.sleep(0.8)
+            for _ in range(4):
+                os.write(mas, b'DEV1\n')
+                time.sleep(0.2)
+            got = lambda d, k: any(e[0] == 'data' and e[2] == d and k in e[3] for e in list(sn.events))
+            self.assertTrue(wait(lambda: got(c.RX, b'DEV1'), 4), 'cihaz->uygulama 1 yakalanamadi')
+            apps[0].wait()
+            # ikinci (farkli) uygulama ayni portu acar
+            apps.append(_sp.Popen(['python3', '-c', code, dev, 'APP2>', '4']))
+            self.assertTrue(wait(lambda: sum(1 for e in list(sn.events) if e[0] == 'info' and 'dinleniyor' in e[3]) >= 2, 8))
+            time.sleep(0.8)
+            for _ in range(4):
+                os.write(mas, b'DEV2\n')
+                time.sleep(0.2)
+            self.assertTrue(wait(lambda: got(c.RX, b'DEV2'), 4), 'ikinci uygulama yakalanamadi')
+            self.assertFalse(has(sn, 'closed'))
+        finally:
+            t0 = time.time()
+            sn.close()
+            self.assertLess(time.time() - t0, 5)
+            for a in apps:
+                a.kill()
+                a.wait()
+            os.close(mas)
+            try:
+                os.close(slv)
+            except OSError:
+                pass
+
+    @unittest.skipUnless(c.IS_POSIX, 'POSIX')
+    def test_pty_pair(self):
+        import tempfile as _tf
+        import termios as _termios
+        d = _tf.mkdtemp()
+        a, b = os.path.join(d, 'ttyV0'), os.path.join(d, 'ttyV1')
+        pr = c.PtyPair(a, b)
+        pr.start()
+        try:
+            self.assertTrue(wait(lambda: has(pr, 'state', 'open'), 3))
+            fa = os.open(a, os.O_RDWR | os.O_NOCTTY)
+            fb = os.open(b, os.O_RDWR | os.O_NOCTTY)
+            import tty as _tty
+            _tty.setraw(fa)
+            _tty.setraw(fb)
+            time.sleep(0.3)
+            os.write(fa, b'from-A')
+            os.write(fb, b'from-B')
+            def rd(fd, n):
+                buf = b''
+                end = time.time() + 3
+                while len(buf) < n and time.time() < end:
+                    import select as _s
+                    if _s.select([fd], [], [], 0.1)[0]:
+                        buf += os.read(fd, 64)
+                return buf
+            self.assertEqual(rd(fb, 6), b'from-A')
+            self.assertEqual(rd(fa, 6), b'from-B')
+            self.assertTrue(wait(lambda: any(e[0] == 'data' and e[2] == c.RX and e[3] == b'from-A' for e in list(pr.events)), 2))
+            self.assertTrue(any(e[0] == 'data' and e[2] == c.TX and e[3] == b'from-B' for e in list(pr.events)))
+            at = _termios.tcgetattr(fa)
+            at[4] = at[5] = _termios.B115200
+            _termios.tcsetattr(fa, _termios.TCSANOW, at)
+            self.assertTrue(wait(lambda: any(e[0] == 'info' and '115200' in e[3] for e in list(pr.events)), 3))
+            os.close(fa)
+            os.close(fb)
+        finally:
+            pr.close()
+        self.assertFalse(os.path.lexists(a))
+        self.assertFalse(os.path.lexists(b))
+
 
 if __name__ == '__main__':
     socket.setdefaulttimeout(5)

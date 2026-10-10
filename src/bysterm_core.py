@@ -519,7 +519,7 @@ class SerialConfig:
 def serial_read_packet(ser, stop, gap, max_chunk, max_wait=0.05):
     """Bir 'paket' oku: ilk bayti bekle, sonra hat `gap` sn sessiz kalana kadar topla.
 
-    Ekranda paketlerin bolunmeden (Hercules/Eltima gibi) gorunmesini saglar; surekli
+    Ekranda paketlerin bolunmeden gorunmesini saglar; surekli
     akista max_wait/max_chunk sinirlari gecikmeyi dusuk tutar.
     """
     first = ser.read(max(1, min(ser.in_waiting, max_chunk)))
@@ -929,7 +929,7 @@ class _PtyEnd:
 
 
 class SerialBridge(Transport):
-    """Eltima tarzi izleme: [Cihaz] <-> GERCEK PORT <-BYSTerm-> SANAL PORT <-> [Uygulama]
+    """Kopru: [Cihaz] <-> GERCEK PORT <-BYSTerm-> SANAL PORT <-> [Uygulama]
 
     Diger uygulama gercek port yerine sanal portu acar; BYSTerm iki yonu de iletir ve
     gosterir. Linux/macOS'ta sanal port otomatik (pty) olusturulur. Windows'ta bir sanal
@@ -980,7 +980,7 @@ class SerialBridge(Transport):
             if self._use_pty():
                 self.pty = _PtyEnd(self.virtual)
                 where = self.virtual if self.virtual else self.pty.slave_name
-                self._state('open', f'Izleme basladi: {self.cfg.short()}  <->  sanal port {where} '
+                self._state('open', f'Kopru kuruldu: {self.cfg.short()}  <->  sanal port {where} '
                                     f'(-> {self.pty.slave_name}). Diger uygulamada "{where}" portunu acin.')
             else:
                 vcfg = SerialConfig(self.virtual, self.cfg.baudrate, self.cfg.bytesize,
@@ -991,7 +991,7 @@ class SerialBridge(Transport):
                     self._state('open', f'Pasif dinleme: A={self.cfg.port}  B={self.virtual} '
                                         f'@{self.cfg.baudrate}')
                 else:
-                    self._state('open', f'Izleme basladi: {self.cfg.short()} <-> {self.virtual}. '
+                    self._state('open', f'Kopru kuruldu: {self.cfg.short()} <-> {self.virtual}. '
                                         f'Diger uygulamada sanal ciftin OBUR ucunu acin.')
         except Exception:
             self.ser.close()
@@ -1188,9 +1188,9 @@ def which(name):
             return fp
     return None
 
-# Eltima tarzi "gercek portu dinleme" Linux/Jetson karsiligi: portu BASKA bir uygulama acsa bile,
-# o surecin seri port uzerindeki read()/write() cagrilarini strace (ptrace) ile izleyip gosteririz.
-# Sanal port GEREKMEZ, izlenen uygulama degismez. (Windows'ta ayni sey imzali cekirdek surucusu ister.)
+# Linux/Jetson'da portu dinleme: portu BASKA bir uygulama acsa bile o surecin seri port uzerindeki
+# read()/write() cagrilarini strace (ptrace) ile izleyip gosteririz. Sanal port GEREKMEZ, izlenen
+# uygulama degismez.
 _SERIAL_DEV_RE = __import__('re').compile(r'/dev/(tty(USB|ACM|S|AMA|THS|TCU|mxc|SAC|O)|cu\.|tty\.)')
 
 
@@ -1340,3 +1340,307 @@ class SerialSniffer(Transport):
                     self.proc.kill()
                 except Exception:
                     pass
+
+
+def port_openers(device):
+    """Linux: `device` portunu acmis surecler -> {pid: (ad, {fd, ...})}. BYSTerm'in kendisi haric."""
+    res = {}
+    if not IS_LINUX or not os.path.isdir('/proc'):
+        return res
+    real = os.path.realpath(device)
+    me = os.getpid()
+    for pid in os.listdir('/proc'):
+        if not pid.isdigit() or int(pid) == me:
+            continue
+        fds = set()
+        try:
+            for fd in os.listdir(f'/proc/{pid}/fd'):
+                try:
+                    if os.path.realpath(f'/proc/{pid}/fd/{fd}') == real:
+                        fds.add(int(fd))
+                except OSError:
+                    continue
+        except OSError:
+            continue
+        if fds:
+            try:
+                with open(f'/proc/{pid}/comm') as f:
+                    name = f.read().strip()
+            except OSError:
+                name = pid
+            res[int(pid)] = (name, fds)
+    return res
+
+
+def _tgid(tid):
+    try:
+        with open(f'/proc/{tid}/status') as f:
+            for line in f:
+                if line.startswith('Tgid:'):
+                    return int(line.split()[1])
+    except (OSError, ValueError):
+        pass
+    return tid
+
+
+class PortSniffer(Transport):
+    """Linux/Jetson: bir seri portu (ornegin /dev/ttyUSB0) pasif dinler. Portu hangi uygulama acarsa
+    onun read()/write() cagrilari strace ile izlenir; uygulama portu kapatip yeniden acsa ya da baska
+    bir uygulama acsa da dinleme kendiliginden devam eder. Porta hic dokunulmaz, sanal port yok.
+
+        read()  -> cihazdan geldi    (RX, 'CIHAZ>')
+        write() -> uygulama gonderdi (TX, 'UYGUL>')
+    """
+    kind = 'sniff'
+    labels = {RX: 'CIHAZ>', TX: 'UYGUL>'}
+    _LINE = SerialSniffer._LINE
+    POLL = 0.5
+
+    def __init__(self, device):
+        super().__init__()
+        self.device = device
+        self.proc = None
+        self.traced = {}          # pid -> (ad, fd kumesi)
+        self._restart = False
+        self.description = device
+
+    def _open_and_run(self):
+        if not IS_LINUX:
+            raise RuntimeError('Bu sistemde seri port dinleme desteklenmiyor')
+        if not which('strace'):
+            raise RuntimeError("strace bulunamadi. Kurun:  sudo apt install strace")
+        if not os.path.exists(self.device):
+            raise RuntimeError(f'Port bulunamadi: {self.device}')
+        self._state('open', f'Dinleme basladi: {self.device}. Portu bir uygulama actiginda trafik burada '
+                            f'gorunur. (Pasif dinleme)')
+        self._spawn(self._watch, name='watch')
+        said_wait = False
+        while not self._stop.is_set():
+            op = port_openers(self.device)
+            if not op:
+                if not said_wait:
+                    self._info(f'{self.device}: portu acan uygulama bekleniyor...')
+                    said_wait = True
+                self._stop.wait(self.POLL)
+                continue
+            said_wait = False
+            self._trace(op)
+
+    def _watch(self):
+        """Porta yeni bir uygulama baglanirsa strace'i o surecle birlikte yeniden baslat."""
+        while not self._stop.wait(1.0):
+            if self.proc is None or self.proc.poll() is not None:
+                continue
+            new = set(port_openers(self.device)) - set(self.traced)
+            if new:
+                self._restart = True
+                self._kill()
+
+    def _trace(self, op):
+        import subprocess as sp
+        self.traced = dict(op)
+        self._restart = False
+        for pid, (name, _fds) in sorted(op.items()):
+            self._info(f'{name} (pid {pid}) portu acti; dinleniyor')
+        cmd = ['strace', '-f', '-e', 'trace=read,write', '-s', '65536', '-xx', '-qqq']
+        for pid in sorted(op):
+            cmd += ['-p', str(pid)]
+        if os.geteuid() != 0 and not all(self._ptrace_ok(p) for p in op):
+            pk = which('pkexec')
+            if pk:
+                cmd = [pk] + cmd
+        self.proc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT, bufsize=1, universal_newlines=True,
+                             errors='replace')
+        single = next(iter(op)) if len(op) == 1 else None
+        tg = {}
+        refreshed = {}
+        for line in self.proc.stdout:
+            if self._stop.is_set():
+                break
+            m = self._LINE.match(line.strip())
+            if not m:
+                if 'ptrace' in line and ('Operation not permitted' in line or 'Could not attach' in line):
+                    self._info('Yetki yok (ptrace). BYSTerm\'i sudo ile acin ya da yonetici izni verin.', 'error')
+                    self._stop.wait(2)
+                continue
+            tid = int(m.group(1)) if m.group(1) else single
+            if tid is None:
+                continue
+            pid = tg.get(tid)
+            if pid is None:
+                pid = tg[tid] = tid if tid in self.traced else _tgid(tid)
+            call, fd, hexs, ret = m.group(2), int(m.group(3)), m.group(4), int(m.group(5))
+            if ret <= 0 or not hexs or pid not in self.traced:
+                continue
+            fds = self.traced[pid][1]
+            if fd not in fds:
+                now = time.monotonic()
+                if now - refreshed.get(pid, 0) < 0.5:
+                    continue
+                refreshed[pid] = now                     # uygulama portu kapatip yeniden acmis olabilir
+                fresh = set(_target_fds(pid, self.device))
+                self.traced[pid] = (self.traced[pid][0], fresh)
+                if fd not in fresh:
+                    continue
+            try:
+                data = bytes(int(hexs[i + 2:i + 4], 16) for i in range(0, len(hexs), 4))[:ret]
+            except ValueError:
+                continue
+            if data:
+                self._data(RX if call == 'read' else TX, data)
+        self._kill()
+        if not self._stop.is_set() and not self._restart:
+            gone = ', '.join(f'{n} (pid {p})' for p, (n, _f) in sorted(self.traced.items()))
+            self._info(f'Uygulama portu birakti: {gone}')
+        self.traced = {}
+
+    @staticmethod
+    def _ptrace_ok(pid):
+        try:
+            with open('/proc/sys/kernel/yama/ptrace_scope') as f:
+                scope = int(f.read().strip())
+        except (OSError, ValueError):
+            scope = 0
+        if scope != 0:
+            return False
+        try:
+            return os.stat(f'/proc/{pid}').st_uid == os.geteuid()
+        except OSError:
+            return False
+
+    def send(self, data, target=None):
+        self._info('Dinleme modunda gonderme yok (pasif)', 'warn')
+
+    def _kill(self):
+        p = self.proc
+        if p is None:
+            return
+        try:
+            p.terminate()
+        except Exception:
+            pass
+        try:
+            p.stdout.close()                # pkexec ile root calisan strace'e sinyal gonderilemez: boru kapaninca cikar
+        except Exception:
+            pass
+        try:
+            p.wait(timeout=1)
+        except Exception:
+            try:
+                p.kill()
+            except Exception:
+                pass
+
+    def _interrupt(self):
+        self._kill()
+
+    def _release(self):
+        self._kill()
+
+
+def _pty_slave_open(master):
+    """Linux: pty'nin obur ucunu acan var mi (POLLHUP yoksa acik). macOS'ta bilinemez -> True."""
+    if not sys.platform.startswith('linux'):
+        return True
+    try:
+        p = select.poll()
+        p.register(master, select.POLLHUP)
+        ev = p.poll(0)
+    except (OSError, ValueError):
+        return True
+    return not any(e & select.POLLHUP for _, e in ev)
+
+
+class PtyPair(Transport):
+    """Linux/macOS: birbirine bagli iki sanal seri port (null-modem). A'yi acan uygulamanin yazdigi
+    B'ye, B'ye yazilan A'ya gider; iki yondeki trafik burada gorunur.
+
+        A'dan gelen -> RX ('A>')     B'den gelen -> TX ('B>')
+    """
+    kind = 'pair'
+    labels = {RX: 'A>', TX: 'B>'}
+
+    def __init__(self, link_a, link_b):
+        super().__init__()
+        self.links = (link_a.strip(), link_b.strip())
+        self.ends = []
+        self.description = f'{self.links[0]} <-> {self.links[1]}'
+
+    def _open_and_run(self):
+        if not IS_POSIX:
+            raise RuntimeError('Bu yontem Linux/macOS icindir')
+        a, b = self.links
+        if not a or not b or a == b:
+            raise ValueError('Iki farkli sanal port yolu girin')
+        self.ends = [_PtyEnd(a)]
+        try:
+            self.ends.append(_PtyEnd(b))
+        except Exception:
+            self.ends[0].close()
+            raise
+        self._state('open', f'Sanal port cifti hazir: {a} (-> {self.ends[0].slave_name})  <->  '
+                            f'{b} (-> {self.ends[1].slave_name}). Bir uygulamada {a}, digerinde {b} portunu acin.')
+        self._spawn(self._settings_loop, name='cfg')
+        masters = [e.master for e in self.ends]
+        opened = [False, False]
+        while not self._stop.is_set():
+            try:
+                r, _, _ = select.select(masters, [], [], 0.2)
+            except (OSError, ValueError):
+                return
+            for i, m in enumerate(masters):
+                if m not in r:
+                    continue
+                try:
+                    data = os.read(m, 65536)
+                except BlockingIOError:
+                    continue
+                except OSError as e:
+                    if e.errno == errno.EIO:          # o ucu acan uygulama yok
+                        if opened[i]:
+                            opened[i] = False
+                            self._state('app-', f'{self.links[i]}: uygulama portu kapatti')
+                        continue
+                    if not self._stop.is_set():
+                        self._fail(f'Sanal port hatasi: {e}')
+                    return
+                if not data:
+                    if opened[i]:
+                        opened[i] = False
+                        self._state('app-', f'{self.links[i]}: uygulama portu kapatti')
+                    continue
+                if not opened[i]:
+                    opened[i] = True
+                    self._state('app+', f'{self.links[i]}: uygulama portu acti')
+                self._data(RX if i == 0 else TX, data)
+                if not _pty_slave_open(masters[1 - i]):
+                    continue                          # karsi ucu acan yok: bekletip sonra bayat veri verme
+                try:
+                    os.write(masters[1 - i], data)
+                except BlockingIOError:
+                    self._info(f'{self.links[1 - i]} tarafi veriyi okumuyor; {len(data)} bayt atildi', 'warn')
+                except OSError:
+                    pass
+
+    def _settings_loop(self):
+        """Uygulamalarin sectigi baud/format'i goster (iki uc birbirinden bagimsiz ayarlanabilir)."""
+        last = [e.initial for e in self.ends]
+        while not self._stop.wait(0.5):
+            for i, e in enumerate(self.ends):
+                try:
+                    cur = e.termios_settings()
+                except Exception:
+                    continue
+                if cur != last[i]:
+                    last[i] = cur
+                    baud, size, parity, stop = cur
+                    sb = '2' if stop == serial.STOPBITS_TWO else '1'
+                    self._info(f'{self.links[i]} port ayari: {baud} {size}{parity}{sb}')
+
+    def send(self, data, target=None):
+        self._info('Bu modda gonderme yok', 'warn')
+
+    def _release(self):
+        for e in self.ends:
+            e.close()
+        self.ends = []

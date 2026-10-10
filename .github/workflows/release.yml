@@ -186,7 +186,8 @@ jobs:
 
             Taşınabilir sürüm ve Linux/Mac paketleri kurulum gerektirmez.
 
-            **Seri port izleme (Eltima gibi):** "Canlı dinleme" ile portu başka bir uygulama açmışken
-            trafiği sanal port olmadan görürsünüz. Linux/Jetson'da doğrudan; Windows'ta USB-seri
-            çeviriciler için ücretsiz, imzalı USBPcap sürücüsüyle (kurulumda tek tik, sonra yeniden başlatma).
+            **Seri İzleme:** sadece portu seçin; portu başka bir uygulama kullanırken trafiği sanal port
+            olmadan görürsünüz. Linux/Jetson'da doğrudan; Windows'ta USB-seri çeviriciler için ücretsiz,
+            imzalı USBPcap sürücüsüyle (kurulumda tek tik, sonra yeniden başlatma).
+            **Sanal Port:** köprü (gerçek ↔ sanal), birbirine bağlı sanal port çifti ve donanım tap.
             USBPcap: GPL-2.0, kaynak kodu https://github.com/desowin/usbpcap. Ayrıntılar: README.
