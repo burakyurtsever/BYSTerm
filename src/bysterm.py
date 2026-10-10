@@ -78,12 +78,13 @@ if QT_API is None:
 import bysterm_core as core   # noqa: E402
 import bysterm_net as net   # noqa: E402
 import bysterm_update as upd   # noqa: E402
+import bysterm_usbsniff as usbsniff   # noqa: E402
 from bysterm_i18n import tr, tx, tx_exact, set_lang, LANGS   # noqa: E402
 
 from bysterm_core import RX, TX  # noqa: E402
 
 APP_NAME = 'BYSTerm'
-APP_VERSION = '0.3.0'
+APP_VERSION = '0.4.0'
 
 Qt = QtCore.Qt
 W = QtWidgets
@@ -1546,11 +1547,14 @@ class MonitorSession(Session):
         # --- mod secimi
         mrow = FlowLayout()
         self.mode_sel = W.QComboBox()
-        self.mode_sel.addItem('Canli dinleme (calisan uygulamayi izle)', 'live')
+        if core.IS_WIN:
+            self.mode_sel.addItem('Canli dinleme (USB-seri, Eltima gibi)', 'live')
+        else:
+            self.mode_sel.addItem('Canli dinleme (calisan uygulamayi izle)', 'live')
         self.mode_sel.addItem('Sanal port koprusu', 'bridge')
         self.mode_sel.addItem('Pasif donanim tap (2 port)', 'tap')
-        if not core.IS_LINUX:
-            self.mode_sel.model().item(0).setEnabled(False)   # canli dinleme: yalniz Linux/Jetson
+        if not (core.IS_LINUX or core.IS_WIN):
+            self.mode_sel.model().item(0).setEnabled(False)   # macOS: canli dinleme yok
             self.mode_sel.setCurrentIndex(1)
         self.mode_sel.currentIndexChanged.connect(self._mode_changed)
         mrow.addWidget(W.QLabel('Yontem'))
@@ -1567,9 +1571,27 @@ class MonitorSession(Session):
         lr = FlowLayout(self.live_row)
         self.proc = W.QComboBox()
         self.proc.setMinimumWidth(320)
-        lr.addWidget(W.QLabel('Uygulama'))
+        if core.IS_WIN:      # Windows: izlenecek COM portu (USB-seri cevirici) secilir
+            self.proc.setToolTip('Izlenecek USB-seri port. Portu baska bir uygulama acmis olabilir; '
+                                 'BYSTerm porta dokunmaz.')
+            lr.addWidget(W.QLabel('Port'))
+        else:
+            lr.addWidget(W.QLabel('Uygulama'))
         lr.addWidget(self.proc, 1)
         col.addWidget(self.live_row)
+
+        # Windows: USBPcap (imzali USB yakalama surucusu) durumu / kurulum
+        self.usb_row = W.QWidget()
+        ur = FlowLayout(self.usb_row)
+        self.btn_usbpcap = W.QPushButton('USB dinleme surucusunu kur (USBPcap)')
+        self.btn_usbpcap.clicked.connect(self._usbpcap_install)
+        self.lbl_usbpcap = W.QLabel('')
+        self.lbl_usbpcap.setStyleSheet('color:#8b929c')
+        self.lbl_usbpcap.setWordWrap(True)
+        ur.addWidget(self.btn_usbpcap)
+        ur.addWidget(self.lbl_usbpcap, 1)
+        col.addWidget(self.usb_row)
+        self.usb_row.setVisible(False)
 
         # --- kopru / tap: gercek port + ayar
         self.ss = SerialSettings(self.main)
@@ -1630,7 +1652,20 @@ class MonitorSession(Session):
         self.live_row.setVisible(mode == 'live')
         self.port_row.setVisible(mode != 'live')
         self.virt_row.setVisible(mode == 'bridge')
-        if mode == 'live':
+        self.usb_row.setVisible(core.IS_WIN and mode == 'live')
+        self.btn_rescan.setToolTip('Portlari yeniden tara' if core.IS_WIN else
+                                   'Seri port acmis uygulamalari yeniden tara')
+        if mode == 'live' and core.IS_WIN:
+            self._fill_procs()
+            self._usbpcap_refresh()
+            self.help.setText(
+                'CANLI DINLEME (Windows, Eltima gibi): Portu BASKA bir uygulama acmisken bile o porttaki '
+                'trafigi SANAL PORT OLMADAN gorursunuz; o uygulama hic degismez, BYSTerm porta dokunmaz. '
+                'Gelen/giden veri, uygulamanin sectigi baud/format ve DTR/RTS degisiklikleri gorunur. '
+                'USB-seri ceviriciler icindir (FTDI, CP210x, CH340, PL2303, Arduino/STM32/ESP32 gibi USB '
+                'CDC). Bir kez ucretsiz USBPcap surucusu kurulur (Wireshark da kullanir, Microsoft imzali). '
+                'Anakart uzerindeki yerlesik COM portlari icin "Sanal port koprusu" yontemini kullanin.')
+        elif mode == 'live':
             self._fill_procs()
             self.help.setText(
                 'CANLI DINLEME (Linux/Jetson): Portu BASKA bir uygulama acsa bile (orn. minicom, kendi '
@@ -1657,6 +1692,8 @@ class MonitorSession(Session):
                 self._c0c_refresh()
 
     def _fill_procs(self):
+        if core.IS_WIN:
+            return self._fill_usb_ports(self.main.ports)
         if not core.IS_LINUX or self.proc.view().isVisible():
             return
         cur = self.proc.currentData()
@@ -1672,6 +1709,54 @@ class MonitorSession(Session):
         idx = self.proc.findData(cur) if cur else -1
         self.proc.setCurrentIndex(max(0, idx))
         self.proc.blockSignals(False)
+
+    def _fill_usb_ports(self, ports):
+        if self.proc.view().isVisible():
+            return
+        cur = self.proc.currentData()
+        self.proc.blockSignals(True)
+        self.proc.clear()
+        for p in ports:
+            if p.vid is not None:        # sadece USB cihazlari
+                self.proc.addItem(p.label, (p.device, p.vid, p.pid))
+        for p in ports:
+            if p.vid is None:
+                self.proc.addItem(p.label + '  (USB degil)', (p.device, None, None))
+        if self.proc.count() == 0:
+            self.proc.addItem('(seri port bulunamadi — USB-seri ceviriciyi takin)', None)
+        idx = -1
+        if cur:
+            for i in range(self.proc.count()):
+                d = self.proc.itemData(i)
+                if d and d[0] == cur[0]:
+                    idx = i
+                    break
+        self.proc.setCurrentIndex(max(0, idx))
+        self.proc.blockSignals(False)
+
+    def _usbpcap_refresh(self):
+        if not core.IS_WIN:
+            return
+        if usbsniff.usbpcap_installed():
+            self.btn_usbpcap.setText('USBPcap kurulu ✓ (yeniden kur)')
+            self.lbl_usbpcap.setText('Hazir. Yeni kurduysaniz Windows\'u bir kez yeniden baslatin.')
+        else:
+            self.btn_usbpcap.setText('USB dinleme surucusunu kur (USBPcap)')
+            self.lbl_usbpcap.setText('Bir kez kurulur (ucretsiz, imzali). Kurulumdan sonra Windows yeniden '
+                                     'baslatilmali.')
+
+    def _usbpcap_install(self):
+        self.btn_usbpcap.setEnabled(False)
+        self.lbl_usbpcap.setText('USBPcap indiriliyor/kuruluyor...')
+        _bg(self, usbsniff.usbpcap_install, self._usbpcap_done)
+
+    def _usbpcap_done(self, res, err):
+        self.btn_usbpcap.setEnabled(True)
+        ok, msg = res if res else (False, str(err))
+        self._usbpcap_refresh()
+        self.lbl_usbpcap.setText(msg)
+        if not ok and 'Iptal' not in msg:
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(usbsniff.USBPCAP_PAGE))
 
     def _fill_virt(self, ports):
         if self.virt.view().isVisible():
@@ -1761,6 +1846,15 @@ class MonitorSession(Session):
         return 'Durdur'
 
     def make_transport(self):
+        if self.cur_mode() == 'live' and core.IS_WIN:
+            d = self.proc.currentData()
+            if not d:
+                raise ValueError('Izlenecek USB-seri portu secin')
+            dev, vid, pid = d
+            if vid is None:
+                raise ValueError(f'{dev} bir USB cihazi degil. Yerlesik COM portlari icin '
+                                 '"Sanal port koprusu" yontemini kullanin.')
+            return usbsniff.UsbSerialSniffer(dev, vid=vid, pid=pid)
         if self.cur_mode() == 'live':
             d = self.proc.currentData()
             if not d:
@@ -1782,11 +1876,14 @@ class MonitorSession(Session):
     def set_inputs_enabled(self, en):
         for w in (self.ss, self.virt, self.chk_follow, self.mode_sel, self.proc, self.btn_rescan):
             w.setEnabled(en)
+        self.btn_usbpcap.setEnabled(en)
 
     def tab_label(self):
         if self.cur_mode() == 'live':
             d = self.proc.currentData()
-            return tx('Dinle ') + os.path.basename(d[1]) if d else tx('Seri Izleme')
+            if not d:
+                return tx('Seri Izleme')
+            return tx('Dinle ') + (d[0] if core.IS_WIN else os.path.basename(d[1]))
         return tx('Izleme ') + os.path.basename(self.ss.current_device() or '')
 
     def update_ports(self, ports):
@@ -2508,7 +2605,7 @@ class PingTab(ToolTab):
                     it.setForeground(QtGui.QBrush(QtGui.QColor(term_colors()[RX] if r.ok else term_colors()['error'])))
         if changed or first:
             if changed or not r.ok:
-                txt = f'{h}: ▲ CEVAP VERMEYE BASLADI' if r.ok else f'{h}: ▼ CEVAP KESILDI ({r.err})'
+                txt = f'{h}: ▲ CEVAP VERMEYE BASLADI' if r.ok else f'{h}: ▼ CEVAP KESILDI ({tx(r.err)})'
                 if first and not r.ok:
                     txt = f'{h}: cevap vermiyor ({tx(r.err)})'
                 segs += self.fmt.text_line(ts, 'info' if r.ok else 'error', txt)

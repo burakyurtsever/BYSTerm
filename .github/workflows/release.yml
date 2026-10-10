@@ -55,6 +55,9 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.8', architecture: x64 }   # 3.8 = Windows 7/8.1 desteği
       - run: python -m pip install pyserial==3.5 PyQt5==5.15.10 PyQt5-Qt5==5.15.2 PyQt5-sip pyinstaller==5.13.2
+      - name: USB serial capture tests (Windows)
+        timeout-minutes: 5
+        run: python src/test_bysterm_usbsniff.py
       - run: python ci/build.py
       - name: Selftest
         timeout-minutes: 5
@@ -98,6 +101,20 @@ jobs:
               Write-Host "com0com pakete eklenecek."
             } else { Write-Host "setup.exe bulunamadi; com0com'suz devam." }
           } else { Write-Host "Hicbir ayna vermedi; installer com0com'suz uretilecek." }
+      - name: Fetch USBPcap (signed USB capture driver for live serial monitoring)
+        shell: pwsh
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocol]::Tls12
+          $u = 'https://github.com/desowin/usbpcap/releases/download/1.5.4.0/USBPcapSetup-1.5.4.0.exe'
+          for ($i = 1; $i -le 4; $i++) {
+            try { Invoke-WebRequest -Uri $u -OutFile installer\USBPcapSetup.exe -UseBasicParsing -TimeoutSec 120; break }
+            catch { Write-Host "deneme $i basarisiz: $_"; Start-Sleep -Seconds (2 * $i) }
+          }
+          $h = (Get-FileHash installer\USBPcapSetup.exe -Algorithm SHA256).Hash.ToLower()
+          if ($h -ne '87a7edf9bbbcf07b5f4373d9a192a6770d2ff3add7aa1e276e82e38582ccb622') { throw "USBPcap ozet uyusmuyor: $h" }
+          $sig = Get-AuthenticodeSignature installer\USBPcapSetup.exe
+          Write-Host "imza: $($sig.Status) $($sig.SignerCertificate.Subject)"
+          "WITH_USBPCAP=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Build installer (Inno Setup)
         shell: pwsh
         run: |
@@ -106,6 +123,7 @@ jobs:
           $ver = if ($env:BYSTERM_VERSION) { $env:BYSTERM_VERSION } else { '0.0.0' }
           $args = @("/DAppVersion=$ver")
           if ($env:WITH_COM0COM -eq '1') { $args += '/DWithCom0com=1' }
+          if ($env:WITH_USBPCAP -eq '1') { $args += '/DWithUSBPcap=1' }
           $args += 'installer\bysterm.iss'
           & $iscc @args
           Copy-Item installer\Output\BYSTerm-Setup-windows-x64.exe release\ -Force
@@ -170,6 +188,7 @@ jobs:
 
             Taşınabilir sürüm ve Linux/Mac paketleri kurulum gerektirmez.
 
-            **Seri port izleme:** Linux/Jetson'da "Canlı dinleme" ile portu başka uygulama açmışken
-            trafiği sanal port olmadan görürsünüz. Windows'ta sanal port köprüsü için com0com (ücretsiz)
-            kullanılır; BYSTerm > Seri İzleme bunu kurmanız için yönlendirir. Ayrıntılar: README.
+            **Seri port izleme (Eltima gibi):** "Canlı dinleme" ile portu başka bir uygulama açmışken
+            trafiği sanal port olmadan görürsünüz. Linux/Jetson'da doğrudan; Windows'ta USB-seri
+            çeviriciler için ücretsiz, imzalı USBPcap sürücüsüyle (kurulumda tek tik, sonra yeniden başlatma).
+            USBPcap: GPL-2.0, kaynak kodu https://github.com/desowin/usbpcap. Ayrıntılar: README.

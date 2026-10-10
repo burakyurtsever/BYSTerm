@@ -23,6 +23,10 @@
   "en": "  (The port may be open in another application.)",
   "tr": "  (Port başka bir uygulamada açık olabilir.)"
  },
+ "  (USB degil)": {
+  "en": "  (not USB)",
+  "tr": "  (USB değil)"
+ },
  "  (cihaz ": {
   "en": "  (device ",
   "tr": "  (cihaz "
@@ -62,6 +66,14 @@
  " &nbsp; <i>[kayit acik]</i>": {
   "en": " &nbsp; <i>[recording]</i>",
   "tr": " &nbsp; <i>[kayıt açık]</i>"
+ },
+ " (USB adres ": {
+  "en": " (USB address ",
+  "tr": " (USB adres "
+ },
+ " (USB). Portu kullanan uygulama hic degismez; sanal port yok. (Pasif dinleme)": {
+  "en": " (USB). The application using the port is not changed at all; no virtual port. (Passive capture)",
+  "tr": " (USB). Portu kullanan uygulama hiç değişmez; sanal port yok. (Pasif dinleme)"
  },
  " (bu arada cihazdan gelen ": {
   "en": " (meanwhile ",
@@ -122,6 +134,14 @@
  " bayt)": {
   "en": " bytes)",
   "tr": " bayt)"
+ },
+ " bir USB cihazi degil. Yerlesik COM portlari icin \"Sanal port koprusu\" yontemini kullanin.": {
+  "en": " is not a USB device. For built-in COM ports use the \"Virtual port bridge\" method.",
+  "tr": " bir USB cihazı değil. Yerleşik COM portları için \"Sanal port köprüsü\" yöntemini kullanın."
+ },
+ " bir USB-seri cevirici olarak bulunamadi. USBPcap yeni kurulduysa Windows'u yeniden baslatin; yerlesik (anakart) COM portlari icin \"Sanal port koprusu\" yontemini kullanin.": {
+  "en": " was not found as a USB serial adapter. If USBPcap was just installed, restart Windows; for built-in (motherboard) COM ports use the \"Virtual port bridge\" method.",
+  "tr": " bir USB-seri çevirici olarak bulunamadı. USBPcap yeni kurulduysa Windows'u yeniden başlatın; yerleşik (anakart) COM portları için \"Sanal port köprüsü\" yöntemini kullanın."
  },
  " bu portu artik acmiyor: ": {
   "en": " no longer has this port open: ",
@@ -199,6 +219,10 @@
   "en": "(no application with an open serial port found — open the port in that application first)",
   "tr": "(seri port açmış uygulama bulunamadı — önce o uygulamada portu açın)"
  },
+ "(seri port bulunamadi — USB-seri ceviriciyi takin)": {
+  "en": "(no serial port found — plug in the USB serial adapter)",
+  "tr": "(seri port bulunamadı — USB-seri çeviriciyi takın)"
+ },
  ")  sira=": {
   "en": ")  seq=",
   "tr": ")  sıra="
@@ -230,6 +254,10 @@
  ", TERS yon (sunucu gonderir)": {
   "en": ", REVERSE direction (server sends)",
   "tr": ", TERS yön (sunucu gönderir)"
+ },
+ ", adres ": {
+  "en": ", address ",
+  "tr": ", adres "
  },
  ". Diger uygulamada sanal ciftin OBUR ucunu acin.": {
   "en": ". Open the OTHER end of the virtual pair in the other application.",
@@ -310,6 +338,10 @@
  ": statik ": {
   "en": ": static ",
   "tr": ": statik "
+ },
+ ": tasma": {
+  "en": ": overrun",
+  "tr": ": taşma"
  },
  ": test hatasi: ": {
   "en": ": test error: ",
@@ -459,6 +491,14 @@
   "en": "FAILED",
   "tr": "BAŞARISIZ"
  },
+ "BREAK alindi": {
+  "en": "BREAK received",
+  "tr": "BREAK alındı"
+ },
+ "BREAK gonderildi": {
+  "en": "BREAK sent",
+  "tr": "BREAK gönderildi"
+ },
  "BYSTerm is a fast test and monitoring tool for embedded and network developers. It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, IP scanning and iperf3 speed tests together in one window with side-by-side panes. It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson without any installation.": {
   "en": "BYSTerm is a fast test and monitoring tool for embedded and network developers. It brings serial ports, TCP, UDP, serial traffic monitoring, network settings, ping, IP scanning and iperf3 speed tests together in one window with side-by-side panes. It stays responsive at high data rates and runs on Windows, macOS, Linux and NVIDIA Jetson without any installation.",
   "tr": "BYSTerm, gömülü sistem ve ağ geliştiricileri için hızlı bir test ve izleme aracıdır. Seri port, TCP, UDP, seri trafik izleme, ağ ayarları, ping, IP tarama ve iperf3 hız testini tek pencerede, yan yana bölmelerde toplar. Yüksek veri hızında donmaz; Windows, macOS, Linux ve NVIDIA Jetson üzerinde kurulum gerektirmeden çalışır."
@@ -523,6 +563,10 @@
   "en": "Drag the title bar to move the pane",
   "tr": "Başlığı tutup sürükleyerek pencereyi taşıyın"
  },
+ "Bir kez kurulur (ucretsiz, imzali). Kurulumdan sonra Windows yeniden baslatilmali.": {
+  "en": "Installed once (free, signed). Windows must be restarted after installation.",
+  "tr": "Bir kez kurulur (ücretsiz, imzalı). Kurulumdan sonra Windows yeniden başlatılmalı."
+ },
  "Bit": {
   "en": "Bits",
   "tr": "Bit"
@@ -567,6 +611,10 @@
   "en": "LIVE CAPTURE (Linux/Jetson): Even if ANOTHER application opens the port (e.g. minicom, your own program), you see that application's serial traffic here WITHOUT A VIRTUAL PORT; the monitored application is not changed at all and the data is not touched (passive). Select the application from the list and start. Admin rights are requested if needed.",
   "tr": "CANLI DİNLEME (Linux/Jetson): Portu BAŞKA bir uygulama açsa bile (örn. minicom, kendi programınız), o uygulamanın seri trafiğini SANAL PORT OLMADAN burada görürsünüz; izlenen uygulama hiç değişmez, veriye dokunulmaz (pasif). Listeden uygulamayı seçip başlatın. Yetki gerekirse yönetici izni istenir."
  },
+ "CANLI DINLEME (Windows, Eltima gibi): Portu BASKA bir uygulama acmisken bile o porttaki trafigi SANAL PORT OLMADAN gorursunuz; o uygulama hic degismez, BYSTerm porta dokunmaz. Gelen/giden veri, uygulamanin sectigi baud/format ve DTR/RTS degisiklikleri gorunur. USB-seri ceviriciler icindir (FTDI, CP210x, CH340, PL2303, Arduino/STM32/ESP32 gibi USB CDC). Bir kez ucretsiz USBPcap surucusu kurulur (Wireshark da kullanir, Microsoft imzali). Anakart uzerindeki yerlesik COM portlari icin \"Sanal port koprusu\" yontemini kullanin.": {
+  "en": "LIVE CAPTURE (Windows, like Eltima): See the traffic of a port even while ANOTHER application has it open, WITHOUT A VIRTUAL PORT; that application is not changed at all and BYSTerm never touches the port. Incoming/outgoing data, the baud/format the application selects and DTR/RTS changes are shown. For USB serial adapters (FTDI, CP210x, CH340, PL2303, USB CDC such as Arduino/STM32/ESP32). The free USBPcap driver is installed once (also used by Wireshark, Microsoft-signed). For built-in motherboard COM ports use the \"Virtual port bridge\" method.",
+  "tr": "CANLI DİNLEME (Windows, Eltima gibi): Portu BAŞKA bir uygulama açmışken bile o porttaki trafiği SANAL PORT OLMADAN görürsünüz; o uygulama hiç değişmez, BYSTerm porta dokunmaz. Gelen/giden veri, uygulamanın seçtiği baud/format ve DTR/RTS değişiklikleri görünür. USB-seri çeviriciler içindir (FTDI, CP210x, CH340, PL2303, Arduino/STM32/ESP32 gibi USB CDC). Bir kez ücretsiz USBPcap sürücüsü kurulur (Wireshark da kullanır, Microsoft imzalı). Anakart üzerindeki yerleşik COM portları için \"Sanal port köprüsü\" yöntemini kullanın."
+ },
  "CIHAZ>": {
   "en": "DEVICE>",
   "tr": "CİHAZ>"
@@ -574,6 +622,10 @@
  "Cancel": {
   "en": "Cancel",
   "tr": "İptal"
+ },
+ "Canli dinleme (USB-seri, Eltima gibi)": {
+  "en": "Live capture (USB serial, like Eltima)",
+  "tr": "Canlı dinleme (USB-seri, Eltima gibi)"
  },
  "Canli dinleme (calisan uygulamayi izle)": {
   "en": "Live capture (monitor a running application)",
@@ -647,9 +699,21 @@
   "en": "Live ",
   "tr": "Canlı "
  },
+ "Dinleme basladi: ": {
+  "en": "Capture started: ",
+  "tr": "Dinleme başladı: "
+ },
  "Dinleme basladi: pid ": {
   "en": "Capture started: pid ",
   "tr": "Dinleme başladı: pid "
+ },
+ "Dinleme durdu (cihaz cikarildi mi?)": {
+  "en": "Capture stopped (was the device unplugged?)",
+  "tr": "Dinleme durdu (cihaz çıkarıldı mı?)"
+ },
+ "Dinleme durdu: ": {
+  "en": "Capture stopped: ",
+  "tr": "Dinleme durdu: "
  },
  "Dinleme hatasi: ": {
   "en": "Listen error: ",
@@ -867,9 +931,21 @@
   "en": "Which network adapter to send from (if there is more than one Ethernet)",
   "tr": "Hangi ağ kartından çıkılsın (birden fazla Ethernet varsa)"
  },
+ "Hat hatasi: ": {
+  "en": "Line error: ",
+  "tr": "Hat hatası: "
+ },
+ "Hat: ": {
+  "en": "Lines: ",
+  "tr": "Hat: "
+ },
  "Hata: ": {
   "en": "Error: ",
   "tr": "Hata: "
+ },
+ "Hazir. Yeni kurduysaniz Windows'u bir kez yeniden baslatin.": {
+  "en": "Ready. If you just installed it, restart Windows once.",
+  "tr": "Hazır. Yeni kurduysanız Windows'u bir kez yeniden başlatın."
  },
  "Hedef": {
   "en": "Target",
@@ -939,6 +1015,10 @@
   "en": "Second port disconnected: ",
   "tr": "İkinci port koptu: "
  },
+ "Indirilen dosya bir kurulum programi degil": {
+  "en": "The downloaded file is not an installer",
+  "tr": "İndirilen dosya bir kurulum programı değil"
+ },
  "Indirme bir ZIP degil (SourceForge ara sayfasi gelmis olabilir). Lutfen com0com.sourceforge.net adresinden elle kurun.": {
   "en": "The download is not a ZIP (a SourceForge intermediate page may have been returned). Please install manually from com0com.sourceforge.net.",
   "tr": "İndirme bir ZIP değil (SourceForge ara sayfası gelmiş olabilir). Lütfen com0com.sourceforge.net adresinden elle kurun."
@@ -1002,6 +1082,14 @@
  "Izlemeyi baslat": {
   "en": "Start monitoring",
   "tr": "İzlemeyi başlat"
+ },
+ "Izlenecek USB-seri port. Portu baska bir uygulama acmis olabilir; BYSTerm porta dokunmaz.": {
+  "en": "USB serial port to monitor. Another application may already have it open; BYSTerm does not touch the port.",
+  "tr": "İzlenecek USB-seri port. Portu başka bir uygulama açmış olabilir; BYSTerm porta dokunmaz."
+ },
+ "Izlenecek USB-seri portu secin": {
+  "en": "Select the USB serial port to monitor",
+  "tr": "İzlenecek USB-seri portu seçin"
  },
  "Izlenecek uygulamayi secin (seri port acmis bir surec)": {
   "en": "Select the application to monitor (a process with an open serial port)",
@@ -1090,6 +1178,10 @@
  "Kurulum tamamlandi (yeniden tarayin)": {
   "en": "Installation complete (rescan)",
   "tr": "Kurulum tamamlandı (yeniden tarayın)"
+ },
+ "Kurulum tamamlanmadi": {
+  "en": "Installation was not completed",
+  "tr": "Kurulum tamamlanmadı"
  },
  "Language": {
   "en": "Language",
@@ -1246,6 +1338,10 @@
  "Port yok": {
   "en": "No ports",
   "tr": "Port yok"
+ },
+ "Portlari yeniden tara": {
+  "en": "Rescan ports",
+  "tr": "Portları yeniden tara"
  },
  "PowerShell cikti vermedi: ": {
   "en": "PowerShell returned no output: ",
@@ -1547,6 +1643,38 @@
   "en": "UDP error: ",
   "tr": "UDP hatası: "
  },
+ "USB CDC (sanal COM)": {
+  "en": "USB CDC (virtual COM)",
+  "tr": "USB CDC (sanal COM)"
+ },
+ "USB cihaz: ": {
+  "en": "USB device: ",
+  "tr": "USB cihaz: "
+ },
+ "USB dinleme surucusunu kur (USBPcap)": {
+  "en": "Install USB capture driver (USBPcap)",
+  "tr": "USB dinleme sürücüsünü kur (USBPcap)"
+ },
+ "USBPcap baslatilamadi (yonetici izni reddedildi mi?)": {
+  "en": "Could not start USBPcap (was admin permission denied?)",
+  "tr": "USBPcap başlatılamadı (yönetici izni reddedildi mi?)"
+ },
+ "USBPcap indiriliyor/kuruluyor...": {
+  "en": "Downloading/installing USBPcap...",
+  "tr": "USBPcap indiriliyor/kuruluyor..."
+ },
+ "USBPcap kuruldu. Dinlemenin calismasi icin Windows'u bir kez yeniden baslatin.": {
+  "en": "USBPcap installed. Restart Windows once for capturing to work.",
+  "tr": "USBPcap kuruldu. Dinlemenin çalışması için Windows'u bir kez yeniden başlatın."
+ },
+ "USBPcap kurulu degil. \"USB dinleme surucusunu kur\" ile bir kez kurun ve Windows'u yeniden baslatin.": {
+  "en": "USBPcap is not installed. Install it once with \"Install USB capture driver\" and restart Windows.",
+  "tr": "USBPcap kurulu değil. \"USB dinleme sürücüsünü kur\" ile bir kez kurun ve Windows'u yeniden başlatın."
+ },
+ "USBPcap kurulu ✓ (yeniden kur)": {
+  "en": "USBPcap installed ✓ (reinstall)",
+  "tr": "USBPcap kurulu ✓ (yeniden kur)"
+ },
  "UYGUL>": {
   "en": "APP>",
   "tr": "UYGUL>"
@@ -1574,6 +1702,10 @@
  "Uygulama": {
   "en": "Application",
   "tr": "Uygulama"
+ },
+ "Uygulama port ayari: ": {
+  "en": "Application port settings: ",
+  "tr": "Uygulama port ayarı: "
  },
  "Uygulama port ayarini degistirdi -> gercek port: ": {
   "en": "Application changed port settings -> real port: ",
@@ -1719,6 +1851,10 @@
   "en": "network unreachable",
   "tr": "ağ erişilemez"
  },
+ "akis yok": {
+  "en": "no flow control",
+  "tr": "akış yok"
+ },
  "alt ag dolu?": {
   "en": "subnet full?",
   "tr": "alt ağ dolu?"
@@ -1738,6 +1874,18 @@
  "bos birakilabilir": {
   "en": "may be left empty",
   "tr": "boş bırakılabilir"
+ },
+ "bozuk pcap kaydi": {
+  "en": "corrupt pcap record",
+  "tr": "bozuk pcap kaydı"
+ },
+ "bozuk pcapng blogu": {
+  "en": "corrupt pcapng block",
+  "tr": "bozuk pcapng bloğu"
+ },
+ "cerceve hatasi": {
+  "en": "framing error",
+  "tr": "çerçeve hatası"
  },
  "chmod sadece seri port cihazlari icin": {
   "en": "chmod is only allowed for serial port devices",
@@ -1866,6 +2014,14 @@
  "ornek: COM11 (com0com ciftinin BIR ucu)": {
   "en": "e.g. COM11 (ONE end of the com0com pair)",
   "tr": "örnek: COM11 (com0com çiftinin BİR ucu)"
+ },
+ "parite hatasi": {
+  "en": "parity error",
+  "tr": "parite hatası"
+ },
+ "pcap akisi degil (bilinmeyen baslik)": {
+  "en": "not a pcap stream (unknown header)",
+  "tr": "pcap akışı değil (bilinmeyen başlık)"
  },
  "ping desteklenmiyor": {
   "en": "ping not supported",

@@ -39,7 +39,7 @@ Python, pip ya da başka bir kütüphane **gerekmez**; her şey dosyanın içind
 
 | Sistem | Dosya | Nasıl açılır |
 |---|---|---|
-| **Windows** 10 / 11 — kurulum (önerilen) | `BYSTerm-Setup-windows-x64.exe` | Çift tıklayıp kurun. Başlat menüsüne eklenir; seri izleme için sanal port sürücüsünü (com0com) de isteğe bağlı kurar. İlk açılışta "Windows bilgisayarınızı korudu" çıkarsa *Ek bilgi → Yine de çalıştır* (imzasız). |
+| **Windows** 10 / 11 — kurulum (önerilen) | `BYSTerm-Setup-windows-x64.exe` | Çift tıklayıp kurun. Başlat menüsüne eklenir; Eltima tarzı canlı seri izleme için USBPcap sürücüsünü de isteğe bağlı kurar. İlk açılışta "Windows bilgisayarınızı korudu" çıkarsa *Ek bilgi → Yine de çalıştır* (imzasız). |
 | **Windows** 10 / 11 — taşınabilir | `BYSTerm-windows-x64.exe` | Kurulumsuz tek dosya. Çift tıklayın. |
 | **macOS** Apple Silicon (M1–M4) | `BYSTerm-macos-arm64.zip` | Zip'i açın, `BYSTerm.app`'i Uygulamalar'a sürükleyin. İlk açılışta *sağ tık → Aç* (imzasız). Olmazsa Terminal'de: `xattr -dr com.apple.quarantine /Applications/BYSTerm.app` |
 | **macOS** Intel | `BYSTerm-macos-x64.zip` | Aynı şekilde |
@@ -102,25 +102,36 @@ Gerçek bir UART 3 Mbaud'da bile ~0.3 MB/s'dir, yani bu sınırın çok altında
 
 Üç yöntem var; **Seri İzleme** penceresinin üstündeki "Yöntem" listesinden seçilir.
 
-**1) Canlı dinleme — Linux / Jetson (sanal port yok, önerilen):**
-Portu BAŞKA bir uygulama açmış olsa bile (minicom, kendi programın, ROS düğümü…) onun seri
-trafiğini olduğu gibi görürsün. İzlenen uygulama hiç değişmez, veriye dokunulmaz (tamamen pasif).
-Listeden seri port açmış uygulamayı seç, başlat. `CIHAZ>` = cihazdan gelen, `UYGUL>` = uygulamanın
-gönderdiği. Çekirdeğin `ptrace` yetkisi gerekir; gerekirse yönetici izni istenir (`sudo apt install strace`).
+**1) Canlı dinleme — Eltima gibi, sanal port yok (önerilen):**
+Portu BAŞKA bir uygulama açmış olsa bile (kendi programın, terminal, ROS düğümü…) onun seri
+trafiğini olduğu gibi görürsün. İzlenen uygulama hiç değişmez, BYSTerm porta dokunmaz (tamamen pasif).
+`CIHAZ>` = cihazdan gelen, `UYGUL>` = uygulamanın gönderdiği.
 
-**2) Sanal port köprüsü (tüm sistemler):**
+- **Windows:** USB-seri çeviriciler için (FTDI, CP210x, CH340/CH341, PL2303 ve Arduino / STM32 /
+  ESP32 / Pico gibi USB CDC cihazlar). Listeden COM portunu seç, başlat. Gelen/giden verinin yanında
+  uygulamanın seçtiği **baud / format** (ör. `115200 baud 8N1`), **DTR/RTS** değişiklikleri ve hat
+  hataları (çerçeve, parite, BREAK) da görünür. Bunun için bir kez ücretsiz **USBPcap** sürücüsü
+  kurulur (kurulum programında tek tik ya da Seri İzleme'deki düğme; sonra Windows bir kez yeniden
+  başlatılır). USBPcap, Wireshark'ın da kullandığı Microsoft imzalı bir USB yakalama sürücüsüdür
+  (GPL-2.0, kaynak: [github.com/desowin/usbpcap](https://github.com/desowin/usbpcap)).
+  Anakart üzerindeki yerleşik COM portları USB olmadığı için onlarda 2. yöntem kullanılır.
+- **Linux / Jetson:** Listeden seri port açmış uygulamayı seç, başlat. Sürücü gerekmez; çekirdeğin
+  `ptrace` yetkisi kullanılır, gerekirse yönetici izni istenir (`sudo apt install strace`).
+
+**2) Sanal port köprüsü (tüm sistemler, her tür port):**
 BYSTerm gerçek portu açar ve bir sanal port oluşturur; izlemek istediğin uygulamada gerçek port
 yerine bu sanal portu açarsın. Linux/macOS'ta sanal port otomatik (`/tmp/ttyV0`). **Windows'ta**
-bir sanal null-modem çifti gerekir — kurulum (installer) bunu **com0com** ile otomatik kurar:
-izlenen uygulamada çiftin bir ucunu (ör. CNCB0), BYSTerm'de diğer ucunu açarsın.
+bir sanal null-modem çifti gerekir (**com0com**, Seri İzleme'deki düğmeyle kurulur): izlenen
+uygulamada çiftin bir ucunu, BYSTerm'de diğer ucunu açarsın.
 
 **3) Pasif donanım tap:**
 İki USB-seri çeviricinin RX uçlarını hattın TX ve RX'ine bağlarsın; BYSTerm ikisini de sadece
 dinler (`A>` / `B>`). İzlenen cihazlara hiç dokunmaz.
 
-> Not: Windows'ta "gerçek portu, sanal port olmadan dinleme" (Eltima'nın yaptığı) imzalı bir
-> çekirdek sürücüsü gerektirir; bu nedenle Windows'ta 2. yöntem (com0com) kullanılır. Linux/Jetson'da
-> 1. yöntem bunu sürücüsüz, sanal portsuz yapar.
+> Nasıl çalışır: Eltima Serial Port Monitor, seri port sürücüsünün üstüne kendi imzalı çekirdek
+> filtre sürücüsünü takar ve porttan geçen her isteği kopyalar. BYSTerm Windows'ta aynı işi USB
+> katmanında yapar: USBPcap da bir filtre sürücüsüdür, USB-seri çeviriciye giden/gelen her paketi
+> kopyalar; BYSTerm bunlardan seri veriyi ve port ayarlarını çözer.
 
 ## Kaynaktan çalıştırma / derleme (geliştirici için)
 
@@ -128,6 +139,7 @@ dinler (`A>` / `B>`). İzlenen cihazlara hiç dokunmaz.
 pip install pyserial PyQt5          # veya PySide6
 python3 src/bysterm.py
 python3 src/test_bysterm_core.py    # çekirdek testleri
+python3 src/test_bysterm_usbsniff.py # USB seri izleme (USBPcap) testleri
 ```
 
 Tek dosya paket: `pip install pyinstaller` → `python3 ci/build.py` → `release/`.
@@ -141,6 +153,7 @@ test eder ve Releases'a koyar.
 |---|---|
 | `src/bysterm.py` | Arayüz (Qt: PySide6 → PyQt5 → PySide2 sırasıyla denenir) |
 | `src/bysterm_core.py` | Qt'siz çekirdek: transport'lar, port tarama, biçimleyici, köprü |
+| `src/bysterm_usbsniff.py` | Windows canlı seri izleme: USBPcap akışından FTDI/CP210x/CH340/PL2303/CDC seri veri ve ayar çözümü |
 | `src/bysterm_net.py` | Qt'siz ağ katmanı: arayüz okuma/yazma, ping, IP tarama, iperf3 protokolü, yönetici yardımcısı |
 | `src/bysterm_i18n.py`, `src/bysterm_i18n_data.py` | Dil desteği. Çeviriler `ci/i18n_map.json`'da; düzenledikten sonra `python3 ci/gen_i18n.py` |
 | `src/test_bysterm_core.py` | Çekirdek testleri |
