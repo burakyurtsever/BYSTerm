@@ -73,7 +73,6 @@ jobs:
           $ver = if ('${{ github.ref_name }}' -match 'v(.+)') { $matches[1] } elseif ('${{ inputs.version }}') { '${{ inputs.version }}' } else { '0.0.0' }
           "BYSTERM_VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           New-Item -ItemType Directory -Force installer\com0com | Out-Null
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocol]::Tls12
           # imzali com0com (3.0.0.0, i386+x64). Birkac aynaya sirayla bak; indirilen dosya ZIP mi diye dogrula.
           $urls = @(
             'https://sourceforge.net/projects/com0com/files/com0com/3.0.0.0/com0com-3.0.0.0-i386-and-x64-signed.zip/download',
@@ -104,7 +103,6 @@ jobs:
       - name: Fetch USBPcap (signed USB capture driver for live serial monitoring)
         shell: pwsh
         run: |
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocol]::Tls12
           $u = 'https://github.com/desowin/usbpcap/releases/download/1.5.4.0/USBPcapSetup-1.5.4.0.exe'
           for ($i = 1; $i -le 4; $i++) {
             try { Invoke-WebRequest -Uri $u -OutFile installer\USBPcapSetup.exe -UseBasicParsing -TimeoutSec 120; break }
